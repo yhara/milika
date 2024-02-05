@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 melior = "0.15.2"
+chumsky = "0.9.3"
+ariadne = "0.3.0"
+anyhow = "1.0"

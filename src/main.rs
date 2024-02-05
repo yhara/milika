@@ -1,3 +1,4 @@
+mod parser;
 use melior::{
     Context,
     dialect::{arith, DialectRegistry, func},
