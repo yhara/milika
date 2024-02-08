@@ -53,6 +53,7 @@ impl Compiler {
         assert!(module.as_operation().verify());
         println!("--");
 
+        // Convert to LLVM Dialect
         let pass_manager = PassManager::new(&self.context);
         pass_manager.add_pass(pass::conversion::create_func_to_llvm());
         pass_manager
@@ -65,7 +66,7 @@ impl Compiler {
         pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
         pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
         pass_manager.run(&mut module).unwrap();
-        //assert!(module.as_operation().verify());
+        assert!(module.as_operation().verify());
         module.as_operation().dump();
         Ok(())
     }

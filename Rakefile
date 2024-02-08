@@ -1,7 +1,11 @@
+PREFIX = if RUBY_PLATFORM =~ /linux/
+           "MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17"
+         else
+           ""
+         end
 task :default do
-  #sh "MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17 cargo run"
   sh "cargo fmt"
-  sh "cargo run -- a.milika"
+  sh "#{PREFIX} cargo run -- a.milika"
 end
 
 task a: :default

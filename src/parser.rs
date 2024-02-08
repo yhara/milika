@@ -139,5 +139,10 @@ fn decl_parser() -> impl Parser<char, ast::Declaration, Error = Simple<char>> {
 }
 
 pub fn parser() -> impl Parser<char, ast::Program, Error = Simple<char>> {
-    decl_parser().padded().repeated().then_ignore(end())
+    let comment = just('#').then(take_until(just('\n'))).padded();
+    decl_parser()
+        .padded_by(comment.repeated())
+        .padded()
+        .repeated()
+        .then_ignore(end())
 }
