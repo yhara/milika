@@ -637,6 +637,7 @@ dependencies = [
  "anyhow",
  "ariadne",
  "chumsky",
+ "either",
  "melior",
 ]
 

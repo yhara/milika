@@ -138,6 +138,6 @@ fn decl_parser() -> impl Parser<char, ast::Declaration, Error = Simple<char>> {
         .or(extern_parser().map(ast::Declaration::Extern))
 }
 
-pub fn parser() -> impl Parser<char, Vec<ast::Declaration>, Error = Simple<char>> {
+pub fn parser() -> impl Parser<char, ast::Program, Error = Simple<char>> {
     decl_parser().padded().repeated().then_ignore(end())
 }

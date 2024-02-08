@@ -1,0 +1,7 @@
+extern print(int n) -> int;
+extern_async sleep_sec(int n) -> int;
+
+fun chiika_main() -> int {
+  print(1);
+  0
+}

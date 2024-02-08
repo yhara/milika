@@ -1,3 +1,5 @@
+pub type Program = Vec<Declaration>;
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
     Extern(Extern),
