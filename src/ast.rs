@@ -22,6 +22,15 @@ impl Extern {
             ret_ty: Box::new(self.ret_ty.clone()),
         }
     }
+
+    pub fn into_empty_func(self) -> Function {
+        Function {
+            name: self.name,
+            params: self.params,
+            ret_ty: self.ret_ty,
+            body_stmts: Default::default(),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]

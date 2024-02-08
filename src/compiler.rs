@@ -6,7 +6,7 @@ use melior::{
     ir::{
         attribute::{StringAttribute, TypeAttribute},
         r#type::FunctionType,
-        *,
+        Block, Identifier, Location, Module, Operation, Region, Type,
     },
     pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
@@ -42,7 +42,9 @@ impl Compiler {
 
         for decl in ast {
             match decl {
-                ast::Declaration::Extern(e) => {}
+                ast::Declaration::Extern(e) => {
+                    module.body().append_operation(self.compile_extern(e)?);
+                }
                 ast::Declaration::Function(f) => {
                     module.body().append_operation(self.compile_func(f)?);
                 }
@@ -71,6 +73,10 @@ impl Compiler {
         Ok(())
     }
 
+    fn compile_extern(&self, ext: ast::Extern) -> Result<Operation> {
+        self.compile_func(ext.into_empty_func())
+    }
+
     fn compile_func(&self, func: ast::Function) -> Result<Operation> {
         let index_type = Type::index(&self.context);
         let block = Block::new(&[(index_type, self.location()), (index_type, self.location())]);
@@ -90,7 +96,7 @@ impl Compiler {
 
         Ok(dialect::func::func(
             &self.context,
-            StringAttribute::new(&self.context, &func.name),
+            self.str_attr(&func.name),
             TypeAttribute::new(
                 FunctionType::new(&self.context, &[index_type, index_type], &[index_type]).into(),
             ),
@@ -106,6 +112,14 @@ impl Compiler {
     //            _ => todo!(),
     //        }
     //    }
+
+    fn identifier(&self, s: &str) -> Identifier {
+        Identifier::new(&self.context, s)
+    }
+
+    fn str_attr(&self, s: &str) -> StringAttribute {
+        StringAttribute::new(&self.context, s)
+    }
 
     fn location(&self) -> Location {
         Location::unknown(&self.context)
