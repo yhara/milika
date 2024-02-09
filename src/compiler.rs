@@ -1,6 +1,6 @@
 use crate::ast;
 use crate::asyncness_check::gather_sigs;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use melior::{
     dialect::{self, DialectRegistry},
     ir::{
@@ -12,6 +12,28 @@ use melior::{
     utility::{register_all_dialects, register_all_llvm_translations},
 };
 use std::collections::HashMap;
+
+fn val<'c, 'a>(x: &'a ValuedOp<'c>) -> ir::Value<'c, 'a> {
+    x.0.result(0)
+        .unwrap_or_else(|_| panic!("this operation has no value"))
+        .into()
+}
+
+struct ValuedOp<'c>(ir::Operation<'c>);
+
+//impl<'c, 'a> TryFrom<ValuedOp<'c>> for ir::Value<'c, 'a> {
+//    type Error = anyhow::Error;
+//    fn try_from(x: ValuedOp) -> Result<Self, Self::Error> {
+//        Ok(x.0.result(0)?.into())
+//    }
+//}
+impl<'c, 'a> From<&'a ValuedOp<'c>> for ir::Value<'c, 'a> {
+    fn from(x: &'a ValuedOp<'c>) -> Self {
+        x.0.result(0)
+            .unwrap_or_else(|_| panic!("this operation has no value"))
+            .into()
+    }
+}
 
 struct Compiler<'run> {
     filename: &'run str,
@@ -140,14 +162,19 @@ impl<'run> Compiler<'run> {
     }
 
     fn compile_stmt(&self, expr: &ast::Expr) -> Result<ir::Operation> {
+        let op = self.compile_expr(expr)?;
+        Ok(op.0)
+    }
+
+    fn compile_expr(&self, expr: &ast::Expr) -> Result<ValuedOp> {
         let op = match expr {
             ast::Expr::Return(val_expr) => {
-                let v = self.compile_stmt(val_expr)?;
-                dialect::func::r#return(&[v.result(0)?.into()], self.unknown_location())
+                let v = self.compile_expr(val_expr)?;
+                dialect::func::r#return(&[val(&v)], self.unknown_location())
             }
             _ => todo!(),
         };
-        Ok(op)
+        Ok(ValuedOp(op))
     }
 
     //    fn compile_expr(&self, expr: &ast::Expr) -> Result<ir::Value> {
