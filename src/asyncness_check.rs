@@ -12,7 +12,7 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, ast::Fu
     // 1st pass
     for decl in decls {
         match decl {
-            ast::Declaration::Extern(x) => {
+            ast::Declaration::Extern((x, _span)) => {
                 sigs.insert(x.name.clone(), x.fun_ty());
             }
             ast::Declaration::Function(x) => {

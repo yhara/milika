@@ -1,8 +1,11 @@
+pub type Span = std::ops::Range<usize>;
+pub type Spanned<T> = (T, Span);
+
 pub type Program = Vec<Declaration>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
-    Extern(Extern),
+    Extern(Spanned<Extern>),
     Function(Function),
 }
 
@@ -112,7 +115,7 @@ impl Expr {
 impl std::fmt::Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Declaration::Extern(x) => write!(f, "{}", x),
+            Declaration::Extern(x) => write!(f, "{}", x.0),
             Declaration::Function(x) => write!(f, "{}", x),
         }
     }

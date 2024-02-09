@@ -24,7 +24,7 @@ fn main() -> Result<()> {
         bail!("usage: milika a.milika > a.mlir");
     };
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
-    let ast = match parser().parse(src) {
+    let ast = match parser().parse(src.clone()) {
         Ok(x) => x,
         Err(errs) => {
             let src = std::fs::read_to_string(path)?;
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
             bail!(s);
         }
     };
-    compiler::run(ast)?;
+    compiler::run(path, &src, ast)?;
     Ok(())
 }
 

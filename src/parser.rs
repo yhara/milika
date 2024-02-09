@@ -1,4 +1,4 @@
-use crate::ast;
+use crate::ast::{self, Spanned};
 use chumsky::prelude::*;
 
 fn ty_parser() -> impl Parser<char, ast::Ty, Error = Simple<char>> {
@@ -116,7 +116,7 @@ fn func_parser() -> impl Parser<char, ast::Function, Error = Simple<char>> {
         })
 }
 
-fn extern_parser() -> impl Parser<char, ast::Extern, Error = Simple<char>> {
+fn extern_parser() -> impl Parser<char, Spanned<ast::Extern>, Error = Simple<char>> {
     just("extern_async")
         .or(just("extern"))
         .then(ident_parser().padded())
@@ -124,11 +124,14 @@ fn extern_parser() -> impl Parser<char, ast::Extern, Error = Simple<char>> {
         .then_ignore(just("->").padded())
         .then(ty_parser().padded())
         .then_ignore(just(';').padded())
-        .map(|(((is_async, name), params), ret_ty)| ast::Extern {
-            is_async: is_async == "extern_async",
-            name,
-            params,
-            ret_ty,
+        .map_with_span(|(((is_async, name), params), ret_ty), span| {
+            let e = ast::Extern {
+                is_async: is_async == "extern_async",
+                name,
+                params,
+                ret_ty,
+            };
+            (e, span)
         })
 }
 

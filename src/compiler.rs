@@ -14,12 +14,14 @@ use melior::{
 };
 use std::collections::HashMap;
 
-struct Compiler {
+struct Compiler<'run> {
+    filename: &'run str,
+    src: &'run str,
     context: Context,
     sigs: HashMap<String, ast::FunTy>,
 }
 
-pub fn run(ast: ast::Program) -> Result<()> {
+pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
     let registry = DialectRegistry::new();
     register_all_dialects(&registry);
 
@@ -29,6 +31,8 @@ pub fn run(ast: ast::Program) -> Result<()> {
     register_all_llvm_translations(&context);
 
     let mut c = Compiler {
+        filename,
+        src,
         context,
         sigs: gather_sigs(&ast)?,
     };
@@ -36,14 +40,16 @@ pub fn run(ast: ast::Program) -> Result<()> {
     Ok(())
 }
 
-impl Compiler {
+impl<'run> Compiler<'run> {
     fn compile_program(&mut self, ast: ast::Program) -> Result<()> {
         let mut module = ir::Module::new(self.location());
 
         for decl in ast {
             match decl {
                 ast::Declaration::Extern(e) => {
-                    module.body().append_operation(self.compile_extern(e)?);
+                    module
+                        .body()
+                        .append_operation(self.compile_extern(e.0, e.1)?);
                 }
                 ast::Declaration::Function(f) => {
                     module.body().append_operation(self.compile_func(f, true)?);
@@ -73,18 +79,18 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_extern(&self, ext: ast::Extern) -> Result<ir::Operation> {
+    fn compile_extern(&self, ext: ast::Extern, span: ast::Span) -> Result<ir::Operation> {
         let attrs = vec![(
-                self.identifier("sym_visibility"),
-                self.str_attr("private").into(),
-            )];
+            self.identifier("sym_visibility"),
+            self.str_attr("private").into(),
+        )];
         Ok(dialect::func::func(
             &self.context,
             self.str_attr(&ext.name),
             TypeAttribute::new(self.function_type(&ext.fun_ty())?),
             Default::default(),
             &attrs,
-            self.location(),
+            self.loc(&span),
         ))
     }
 
@@ -171,6 +177,23 @@ impl Compiler {
 
     fn str_attr(&self, s: &str) -> StringAttribute {
         StringAttribute::new(&self.context, s)
+    }
+
+    fn loc(&self, span: &ast::Span) -> ir::Location {
+        let mut line = 1;
+        let mut col = 1;
+        for i in 0..span.start {
+            match self.src.as_bytes().get(i).unwrap() {
+                b'\n' => {
+                    line += 1;
+                    col = 1;
+                }
+                _ => {
+                    col += 1;
+                }
+            }
+        }
+        ir::Location::new(&self.context, &self.filename, line, col)
     }
 
     fn location(&self) -> ir::Location {
