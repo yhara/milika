@@ -6,7 +6,7 @@ pub type Program = Vec<Declaration>;
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
     Extern(Spanned<Extern>),
-    Function(Function),
+    Function(Spanned<Function>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -115,8 +115,8 @@ impl Expr {
 impl std::fmt::Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Declaration::Extern(x) => write!(f, "{}", x.0),
-            Declaration::Function(x) => write!(f, "{}", x),
+            Declaration::Extern((x, _)) => write!(f, "{}", x),
+            Declaration::Function((x, _)) => write!(f, "{}", x),
         }
     }
 }

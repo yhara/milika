@@ -15,7 +15,7 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, ast::Fu
             ast::Declaration::Extern((x, _span)) => {
                 sigs.insert(x.name.clone(), x.fun_ty());
             }
-            ast::Declaration::Function(x) => {
+            ast::Declaration::Function((x, _span)) => {
                 funcs.insert(x.name.clone(), x);
                 queue.push(x.name.clone());
             }

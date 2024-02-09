@@ -52,7 +52,9 @@ impl<'run> Compiler<'run> {
                         .append_operation(self.compile_extern(e.0, e.1)?);
                 }
                 ast::Declaration::Function(f) => {
-                    module.body().append_operation(self.compile_func(f, true)?);
+                    module
+                        .body()
+                        .append_operation(self.compile_func(f.0, f.1, true)?);
                 }
             }
         }
@@ -94,7 +96,12 @@ impl<'run> Compiler<'run> {
         ))
     }
 
-    fn compile_func(&self, f: ast::Function, is_extern: bool) -> Result<ir::Operation> {
+    fn compile_func(
+        &self,
+        f: ast::Function,
+        span: ast::Span,
+        is_extern: bool,
+    ) -> Result<ir::Operation> {
         let index_type = ir::Type::index(&self.context);
         let block = self.create_main_block(&f)?;
         //ir::Block::new(&[(index_type, self.location()), (index_type, self.location())]);
@@ -126,7 +133,7 @@ impl<'run> Compiler<'run> {
             TypeAttribute::new(self.function_type(&f.fun_ty(false))?),
             region,
             &attrs,
-            self.location(),
+            self.loc(&span),
         ))
     }
 

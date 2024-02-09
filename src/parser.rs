@@ -101,18 +101,21 @@ fn params_parser() -> impl Parser<char, Vec<ast::Param>, Error = Simple<char>> {
     param_parser().padded().separated_by(just(','))
 }
 
-fn func_parser() -> impl Parser<char, ast::Function, Error = Simple<char>> {
+fn func_parser() -> impl Parser<char, Spanned<ast::Function>, Error = Simple<char>> {
     just("fun")
         .ignore_then(ident_parser().padded())
         .then(params_parser().delimited_by(just('('), just(')')))
         .then_ignore(just("->").padded())
         .then(ty_parser().padded())
         .then(stmts_parser().delimited_by(just('{'), just('}')))
-        .map(|(((name, params), ret_ty), body_stmts)| ast::Function {
-            name,
-            params,
-            ret_ty,
-            body_stmts,
+        .map_with_span(|(((name, params), ret_ty), body_stmts), span| {
+            let f = ast::Function {
+                name,
+                params,
+                ret_ty,
+                body_stmts,
+            };
+            (f, span)
         })
 }
 
