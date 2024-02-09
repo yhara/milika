@@ -42,7 +42,7 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
 
 impl<'run> Compiler<'run> {
     fn compile_program(&mut self, ast: ast::Program) -> Result<()> {
-        let mut module = ir::Module::new(self.location());
+        let mut module = ir::Module::new(self.unknown_location());
 
         for decl in ast {
             match decl {
@@ -144,7 +144,7 @@ impl<'run> Compiler<'run> {
             .map(|x| self.mlir_type(&x.ty))
             .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .map(|x| (x, self.location()))
+            .map(|x| (x, self.unknown_location()))
             .collect::<Vec<_>>();
         //let ret_ty = (self.mlir_type(&f.ret_ty)?, self.location());
         Ok(ir::Block::new(&param_tys))
@@ -203,7 +203,7 @@ impl<'run> Compiler<'run> {
         ir::Location::new(&self.context, &self.filename, line, col)
     }
 
-    fn location(&self) -> ir::Location {
+    fn unknown_location(&self) -> ir::Location {
         ir::Location::unknown(&self.context)
     }
 }
