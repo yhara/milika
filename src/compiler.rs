@@ -1,6 +1,6 @@
 use crate::ast;
 use crate::asyncness_check::gather_sigs;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use melior::{
     dialect::{self, DialectRegistry},
     ir::{
@@ -10,14 +10,13 @@ use melior::{
     },
     pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
-    Context,
 };
 use std::collections::HashMap;
 
 struct Compiler<'run> {
     filename: &'run str,
     src: &'run str,
-    context: Context,
+    context: melior::Context,
     sigs: HashMap<String, ast::FunTy>,
 }
 
@@ -25,7 +24,7 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
     let registry = DialectRegistry::new();
     register_all_dialects(&registry);
 
-    let context = Context::new();
+    let context = melior::Context::new();
     context.append_dialect_registry(&registry);
     context.load_all_available_dialects();
     register_all_llvm_translations(&context);
@@ -102,19 +101,10 @@ impl<'run> Compiler<'run> {
         span: ast::Span,
         is_extern: bool,
     ) -> Result<ir::Operation> {
-        let index_type = ir::Type::index(&self.context);
         let block = self.create_main_block(&f)?;
-        //ir::Block::new(&[(index_type, self.location()), (index_type, self.location())]);
-        //let sum = block.append_operation(dialect::arith::addi(
-        //    block.argument(0).unwrap().into(),
-        //    block.argument(1).unwrap().into(),
-        //    self.location(),
-        //));
-
-        //block.append_operation(dialect::func::r#return(
-        //    &[sum.result(0).unwrap().into()],
-        //    self.location(),
-        //));
+        for stmt in &f.body_stmts {
+            block.append_operation(self.compile_stmt(stmt)?);
+        }
 
         let region = ir::Region::new();
         region.append_block(block);
@@ -146,15 +136,27 @@ impl<'run> Compiler<'run> {
             .into_iter()
             .map(|x| (x, self.unknown_location()))
             .collect::<Vec<_>>();
-        //let ret_ty = (self.mlir_type(&f.ret_ty)?, self.location());
         Ok(ir::Block::new(&param_tys))
     }
 
-    //    fn compile_expr(&self, expr: ast::Expr) -> todo {
-    //        match expr {
-    //            ast::Expr::Number(n) => {}
-    //            _ => todo!(),
-    //        }
+    fn compile_stmt(&self, expr: &ast::Expr) -> Result<ir::Operation> {
+        let op = match expr {
+            ast::Expr::Return(val_expr) => {
+                let v = self.compile_stmt(val_expr)?;
+                dialect::func::r#return(&[v.result(0)?.into()], self.unknown_location())
+            }
+            _ => todo!(),
+        };
+        Ok(op)
+    }
+
+    //    fn compile_expr(&self, expr: &ast::Expr) -> Result<ir::Value> {
+    //        let op = self.compile_stmt(expr)?;
+    //        Ok(op
+    //            .clone()
+    //            .result(0)
+    //            .context("does not have 0-th result")?
+    //            .into())
     //    }
 
     fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::Type> {

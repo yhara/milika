@@ -73,21 +73,29 @@ fn expr_parser() -> impl Parser<char, ast::Expr, Error = Simple<char>> {
             .ignore_then(ident_parser())
             .map(ast::Expr::Alloc);
 
+        let retn = just("return")
+            .padded()
+            .ignore_then(expr.clone())
+            .map(|e| ast::Expr::Return(Box::new(e)));
+
         let assign = ident_parser()
             .padded()
             .then_ignore(just('=').padded())
             .then(expr.clone())
             .map(|(name, rhs)| ast::Expr::Assign(name, Box::new(rhs)));
 
-        alloc.or(assign).or(sum).or(atomic_parser(expr))
+        alloc.or(retn).or(assign).or(sum).or(atomic_parser(expr))
     })
 }
 
 fn stmts_parser() -> impl Parser<char, Vec<ast::Expr>, Error = Simple<char>> {
+    let comment = just('#').then(take_until(just('\n'))).padded();
     expr_parser()
         .padded()
-        .separated_by(just(';'))
-        .allow_trailing()
+        .then_ignore(just(';'))
+        .padded_by(comment.repeated())
+        .padded()
+        .repeated()
 }
 
 fn param_parser() -> impl Parser<char, ast::Param, Error = Simple<char>> {
