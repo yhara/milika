@@ -5,8 +5,8 @@ use melior::{
     dialect::{self, DialectRegistry},
     ir::{
         self,
-        attribute::{StringAttribute, TypeAttribute},
-        r#type::FunctionType,
+        attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
+        r#type::{FunctionType, IntegerType, Type},
     },
     pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
@@ -21,10 +21,10 @@ fn val<'c, 'a>(x: &'a ir::Operation<'c>) -> ir::Value<'c, 'a> {
         .into()
 }
 
-struct Compiler<'run> {
+struct Compiler<'run: 'c, 'c> {
     filename: &'run str,
     src: &'run str,
-    context: melior::Context,
+    context: &'c melior::Context,
     sigs: HashMap<String, ast::FunTy>,
 }
 
@@ -40,34 +40,31 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
     let mut c = Compiler {
         filename,
         src,
-        context,
+        context: &context,
         sigs: gather_sigs(&ast)?,
     };
     c.compile_program(ast)?;
     Ok(())
 }
 
-impl<'run> Compiler<'run> {
+impl<'run, 'c> Compiler<'run, 'c> {
     fn compile_program(&mut self, ast: ast::Program) -> Result<()> {
         let mut module = ir::Module::new(self.unknown_location());
+        let block = module.body();
 
         for decl in ast {
             match decl {
                 ast::Declaration::Extern(e) => {
-                    module
-                        .body()
-                        .append_operation(self.compile_extern(e.0, e.1)?);
+                    block.append_operation(self.compile_extern(e.0, e.1)?);
                 }
                 ast::Declaration::Function(f) => {
-                    module
-                        .body()
-                        .append_operation(self.compile_func(f.0, f.1, true)?);
+                    block.append_operation(self.compile_func(f.0, f.1, true)?);
                 }
             }
         }
 
         module.as_operation().dump();
-        assert!(module.as_operation().verify());
+        //assert!(module.as_operation().verify());
         println!("--");
 
         // Convert to LLVM Dialect
@@ -83,8 +80,8 @@ impl<'run> Compiler<'run> {
         pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
         pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
         pass_manager.run(&mut module).unwrap();
-        assert!(module.as_operation().verify());
         module.as_operation().dump();
+        assert!(module.as_operation().verify());
         Ok(())
     }
 
@@ -111,7 +108,7 @@ impl<'run> Compiler<'run> {
     ) -> Result<ir::Operation> {
         let block = self.create_main_block(&f)?;
         for stmt in &f.body_stmts {
-            block.append_operation(self.compile_stmt(stmt)?);
+            block.append_operation(self.compile_expr(&block, stmt)?);
         }
 
         let region = ir::Region::new();
@@ -147,17 +144,26 @@ impl<'run> Compiler<'run> {
         Ok(ir::Block::new(&param_tys))
     }
 
-    fn compile_stmt(&self, expr: &ast::Expr) -> Result<ir::Operation> {
-        self.compile_expr(expr)
-    }
+    //    fn compile_stmt(&self, block: &ir::Block, expr: &ast::Expr) -> Result<ir::Operation> {
+    //        self.compile_expr(block, expr)
+    //    }
 
-    fn compile_expr(&self, expr: &ast::Expr) -> Result<ir::Operation> {
+    fn compile_expr<'a: 'run>(
+        &'run self,
+        block: &'a ir::Block,
+        expr: &ast::Expr,
+    ) -> Result<ir::Operation<'run>> {
         let op = match expr {
+            ast::Expr::Number(n) => dialect::arith::constant(
+                &self.context,
+                IntegerAttribute::new(*n, IntegerType::signed(&self.context, 64).into()).into(),
+                self.unknown_location(),
+            ),
             ast::Expr::Return(val_expr) => {
-                let v = self.compile_expr(val_expr)?;
+                let v = block.append_operation(self.compile_expr(block, val_expr)?);
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
             }
-            _ => todo!(),
+            _ => todo!("{:?}", expr),
         };
         Ok(op)
     }
@@ -175,6 +181,7 @@ impl<'run> Compiler<'run> {
     fn mlir_type(&self, ty: &ast::Ty) -> Result<ir::Type> {
         let t = match ty {
             ast::Ty::Raw(s) => match &s[..] {
+                "none" => Type::none(&self.context).into(),
                 "int" => ir::r#type::IntegerType::signed(&self.context, 64).into(),
                 _ => return Err(anyhow!("unknown type `{}'", s)),
             },
