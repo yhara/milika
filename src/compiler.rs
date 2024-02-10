@@ -13,26 +13,12 @@ use melior::{
 };
 use std::collections::HashMap;
 
-fn val<'c, 'a>(x: &'a ValuedOp<'c>) -> ir::Value<'c, 'a> {
-    x.0.result(0)
+/// Get the first result value of an operation.
+/// Panics if the operation yields no value
+fn val<'c, 'a>(x: &'a ir::Operation<'c>) -> ir::Value<'c, 'a> {
+    x.result(0)
         .unwrap_or_else(|_| panic!("this operation has no value"))
         .into()
-}
-
-struct ValuedOp<'c>(ir::Operation<'c>);
-
-//impl<'c, 'a> TryFrom<ValuedOp<'c>> for ir::Value<'c, 'a> {
-//    type Error = anyhow::Error;
-//    fn try_from(x: ValuedOp) -> Result<Self, Self::Error> {
-//        Ok(x.0.result(0)?.into())
-//    }
-//}
-impl<'c, 'a> From<&'a ValuedOp<'c>> for ir::Value<'c, 'a> {
-    fn from(x: &'a ValuedOp<'c>) -> Self {
-        x.0.result(0)
-            .unwrap_or_else(|_| panic!("this operation has no value"))
-            .into()
-    }
 }
 
 struct Compiler<'run> {
@@ -162,11 +148,10 @@ impl<'run> Compiler<'run> {
     }
 
     fn compile_stmt(&self, expr: &ast::Expr) -> Result<ir::Operation> {
-        let op = self.compile_expr(expr)?;
-        Ok(op.0)
+        self.compile_expr(expr)
     }
 
-    fn compile_expr(&self, expr: &ast::Expr) -> Result<ValuedOp> {
+    fn compile_expr(&self, expr: &ast::Expr) -> Result<ir::Operation> {
         let op = match expr {
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(val_expr)?;
@@ -174,17 +159,8 @@ impl<'run> Compiler<'run> {
             }
             _ => todo!(),
         };
-        Ok(ValuedOp(op))
+        Ok(op)
     }
-
-    //    fn compile_expr(&self, expr: &ast::Expr) -> Result<ir::Value> {
-    //        let op = self.compile_stmt(expr)?;
-    //        Ok(op
-    //            .clone()
-    //            .result(0)
-    //            .context("does not have 0-th result")?
-    //            .into())
-    //    }
 
     fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::Type> {
         let param_tys = fun_ty
