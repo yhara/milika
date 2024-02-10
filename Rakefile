@@ -20,3 +20,7 @@ task :hand do
     < a.mlir > a2.mlir"
   sh "mlir-translate --mlir-to-llvmir a2.mlir > a.ll"
 end
+
+task :llvm do
+  sh "mlir-translate --mlir-to-llvmir c.mlir > c.ll"
+end

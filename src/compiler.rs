@@ -5,7 +5,7 @@ use melior::{
     dialect::{self, DialectRegistry},
     ir::{
         self,
-        attribute::{IntegerAttribute, StringAttribute, TypeAttribute},
+        attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
         r#type::{FunctionType, IntegerType, Type},
     },
     pass::{self, PassManager},
@@ -101,7 +101,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(dialect::func::func(
             &self.context,
             self.str_attr(&ext.name),
-            TypeAttribute::new(self.function_type(&ext.fun_ty())?),
+            TypeAttribute::new(self.function_type(&ext.fun_ty())?.into()),
             Default::default(),
             &attrs,
             self.loc(&span),
@@ -134,7 +134,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(dialect::func::func(
             &self.context,
             self.str_attr(&f.name),
-            TypeAttribute::new(self.function_type(&f.fun_ty(false))?),
+            TypeAttribute::new(self.function_type(&f.fun_ty(false))?.into()),
             region,
             &attrs,
             self.loc(&span),
@@ -153,10 +153,6 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(ir::Block::new(&param_tys))
     }
 
-    //    fn compile_stmt(&self, block: &ir::Block, expr: &ast::Expr) -> Result<ir::Operation> {
-    //        self.compile_expr(block, expr)
-    //    }
-
     fn compile_expr(
         &'run self,
         block: &'c ir::Block,
@@ -168,11 +164,11 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
                 IntegerAttribute::new(*n, IntegerType::signed(&self.context, 64).into()).into(),
                 self.unknown_location(),
             ),
+            ast::Expr::VarRef(name) => return self.compile_varref(block, name),
             ast::Expr::FunCall(fexpr, arg_exprs) => {
                 return self.compile_funcall(block, fexpr, arg_exprs)
             }
             ast::Expr::Return(val_expr) => {
-                //let v = block.append_operation(self.compile_expr(block, val_expr)?);
                 let v = self.compile_expr(block, val_expr)?;
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
             }
@@ -215,7 +211,25 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
-    fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::Type> {
+    fn compile_varref(
+        &'run self,
+        block: &'c ir::Block,
+        name: &str,
+    ) -> Result<ir::OperationRef<'c, 'c>> {
+        let op = if let Some(fun_ty) = self.sigs.get(name) {
+            dialect::func::constant(
+                &self.context,
+                FlatSymbolRefAttribute::new(self.context, name),
+                self.function_type(fun_ty)?,
+                self.unknown_location(),
+            )
+        } else {
+            todo!()
+        };
+        Ok(block.append_operation(op))
+    }
+
+    fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::r#type::FunctionType> {
         let param_tys = self.mlir_types(&fun_ty.param_tys)?;
         let ret_ty = self.mlir_type(&fun_ty.ret_ty)?;
         Ok(FunctionType::new(&self.context, &param_tys, &[ret_ty]).into())
@@ -232,7 +246,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
                 "int" => ir::r#type::IntegerType::signed(&self.context, 64).into(),
                 _ => return Err(anyhow!("unknown type `{}'", s)),
             },
-            ast::Ty::Fun(fun_ty) => return self.function_type(fun_ty),
+            ast::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
         Ok(t)
     }
