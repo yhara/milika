@@ -2,7 +2,7 @@ use crate::ast;
 use crate::asyncness_check::gather_sigs;
 use anyhow::{anyhow, Result};
 use melior::{
-    dialect::{self, DialectRegistry},
+    dialect::{self, ods::r#async, DialectRegistry},
     ir::{
         self,
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
@@ -71,9 +71,9 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             }
         }
 
-        module.as_operation().dump();
+        //module.as_operation().dump();
+        //println!("--");
         //assert!(module.as_operation().verify());
-        println!("--");
 
         // Convert to LLVM Dialect
         let pass_manager = PassManager::new(&self.context);
@@ -88,6 +88,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
         pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
         pass_manager.run(&mut module).unwrap();
+        eprintln!("--CUTHERE--");
         module.as_operation().dump();
         assert!(module.as_operation().verify());
         Ok(())
@@ -161,7 +162,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         let op = match expr {
             ast::Expr::Number(n) => dialect::arith::constant(
                 &self.context,
-                IntegerAttribute::new(*n, IntegerType::signed(&self.context, 64).into()).into(),
+                IntegerAttribute::new(*n, IntegerType::new(&self.context, 64).into()).into(),
                 self.unknown_location(),
             ),
             ast::Expr::VarRef(name) => return self.compile_varref(block, name),
@@ -171,6 +172,10 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(block, val_expr)?;
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
+                //r#async::ReturnOp::builder(&self.context, self.unknown_location())
+                //    .operands(&[])
+                //    .build()
+                //    .into()
             }
             _ => todo!("{:?}", expr),
         };
@@ -243,7 +248,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         let t = match ty {
             ast::Ty::Raw(s) => match &s[..] {
                 "none" => Type::none(&self.context).into(),
-                "int" => ir::r#type::IntegerType::signed(&self.context, 64).into(),
+                "int" => ir::r#type::IntegerType::new(&self.context, 64).into(),
                 _ => return Err(anyhow!("unknown type `{}'", s)),
             },
             ast::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
