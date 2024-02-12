@@ -2,7 +2,11 @@ use crate::ast;
 use crate::asyncness_check::gather_sigs;
 use anyhow::{anyhow, Result};
 use melior::{
-    dialect::{self, ods::r#async, DialectRegistry},
+    dialect::{
+        self,
+        // ods::r#async,
+        DialectRegistry,
+    },
     ir::{
         self,
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
@@ -265,20 +269,25 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     }
 
     fn loc(&self, span: &ast::Span) -> ir::Location {
-        let mut line = 1;
-        let mut col = 1;
-        for i in 0..span.start {
-            match self.src.as_bytes().get(i).unwrap() {
-                b'\n' => {
-                    line += 1;
-                    col = 1;
-                }
-                _ => {
-                    col += 1;
-                }
-            }
-        }
-        ir::Location::new(&self.context, &self.filename, line, col)
+        //        let mut line = 1;
+        //        let mut col = 1;
+        //        for i in 0..span.start {
+        //            match self.src.as_bytes().get(i).unwrap() {
+        //                b'\n' => {
+        //                    line += 1;
+        //                    col = 1;
+        //                }
+        //                _ => {
+        //                    col += 1;
+        //                }
+        //            }
+        //        }
+        ir::Location::new(
+            &self.context,
+            &self.filename,
+            span.location_line() as usize,
+            span.get_utf8_column(),
+        )
     }
 
     fn unknown_location(&self) -> ir::Location {

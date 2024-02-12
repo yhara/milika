@@ -2,8 +2,13 @@ extern putchar(int n) -> int;
 # extern_async sleep_sec(int n) -> int;
 
 fun main() -> int {
-  putchar(65);
-  putchar(65);
-  putchar(65);
+  para {
+    putchar(65);
+    putchar(66);
+    putchar(67);
+  }
+  putchar(68);
+  putchar(69);
+  putchar(70);
   return 0;
 }

@@ -1,12 +1,13 @@
-pub type Span = std::ops::Range<usize>;
-pub type Spanned<T> = (T, Span);
+use nom_locate;
+pub type Span<'a> = nom_locate::LocatedSpan<&'a str>;
+pub type Spanned<'a, T> = (T, Span<'a>);
 
-pub type Program = Vec<Declaration>;
+pub type Program<'a> = Vec<Declaration<'a>>;
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Declaration {
-    Extern(Spanned<Extern>),
-    Function(Spanned<Function>),
+pub enum Declaration<'a> {
+    Extern(Spanned<'a, Extern>),
+    Function(Spanned<'a, Function>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -98,6 +99,7 @@ pub enum Expr {
     Alloc(String),
     Assign(String, Box<Expr>),
     Return(Box<Expr>),
+    Para(Vec<Expr>),
 }
 
 impl Expr {
