@@ -1,11 +1,10 @@
 use crate::ast::{self, Spanned};
 use anyhow::{anyhow, Result};
-use ariadne::{Label, Report, ReportKind, Source};
+//use ariadne::{Label, Report, ReportKind, Source};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
     character::complete::{alphanumeric1, multispace0, multispace1},
-    character::is_newline,
     combinator::eof,
     multi::many0,
     sequence::{delimited, preceded},
@@ -15,7 +14,14 @@ use nom_locate::{self, position};
 type Span<'a> = nom_locate::LocatedSpan<&'a str>;
 type E<'a> = nom::error::VerboseError<Span<'a>>;
 
-//fn render_parse_error(src: &str, span: std::ops::Range<usize>, msg: String) -> String {
+//impl<'a> core::ops::Deref for Span<'a> {
+//    type Target = &'a str;
+//    fn deref(&self) -> &Self::Target {
+//        &self.fragment
+//    }
+//}
+
+//fn render_parse_error(src: &str, e: E) -> String {
 //    let mut rendered = vec![];
 //    Report::build(ReportKind::Error, "", span.start)
 //        .with_message(msg.clone())
@@ -28,8 +34,20 @@ type E<'a> = nom::error::VerboseError<Span<'a>>;
 
 pub fn parse(src: &str) -> Result<ast::Program> {
     let input = Span::new(src);
-    let (_, prog) = parse_decls(input).map_err(|e| anyhow!("{}", e))?;
-    Ok(prog)
+    match parse_decls(input) {
+        Ok((_, prog)) => Ok(prog),
+        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
+            // https://github.com/fflorent/nom_locate/issues/36#issuecomment-1013469728
+            let errors = e
+                .errors
+                .into_iter()
+                .map(|(input, error)| (*input.fragment(), error))
+                .collect();
+            let s = nom::error::convert_error(src, nom::error::VerboseError { errors });
+            Err(anyhow!("{}", s))
+        }
+        _ => unreachable!(),
+    }
 }
 
 fn parse_decls(s: Span) -> IResult<Span, Vec<ast::Declaration>, E> {
