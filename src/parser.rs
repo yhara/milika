@@ -144,18 +144,17 @@ fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 }
 
 fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    alt((parse_funcall, alt((parse_number, parse_varref))))(s)
+    alt((
+        parse_para,
+        alt((parse_funcall, alt((parse_number, parse_varref)))),
+    ))(s)
 }
 
-fn parse_number<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    // TODO: Just parse integer
-    let (s, n) = number::complete::double(s)?;
-    Ok((s, ast::Expr::Number(n.floor() as i64)))
-}
-
-fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, (name, _pos)) = parse_ident(s)?;
-    Ok((s, ast::Expr::VarRef(name)))
+fn parse_para<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, _) = tag("para")(s)?;
+    let (s, name) = multispace1(s)?;
+    let (s, exprs) = parse_block(s)?;
+    Ok((s, ast::Expr::Para(exprs)))
 }
 
 fn parse_funcall<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
@@ -174,6 +173,17 @@ fn parse_arg_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
 
 fn parse_args<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
     separated_list0(delimited(multispace0, tag(","), multispace0), parse_expr)(s)
+}
+
+fn parse_number<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    // TODO: Just parse integer
+    let (s, n) = number::complete::double(s)?;
+    Ok((s, ast::Expr::Number(n.floor() as i64)))
+}
+
+fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, (name, _pos)) = parse_ident(s)?;
+    Ok((s, ast::Expr::VarRef(name)))
 }
 
 fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>, E> {

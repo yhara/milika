@@ -2,11 +2,7 @@ use crate::ast;
 use crate::asyncness_check::gather_sigs;
 use anyhow::{anyhow, Result};
 use melior::{
-    dialect::{
-        self,
-        // ods::r#async,
-        DialectRegistry,
-    },
+    dialect::{self, ods::r#async, DialectRegistry},
     ir::{
         self,
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
@@ -164,11 +160,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         expr: &ast::Expr,
     ) -> Result<ir::OperationRef<'c, 'c>> {
         let op = match expr {
-            ast::Expr::Number(n) => dialect::arith::constant(
-                &self.context,
-                IntegerAttribute::new(*n, IntegerType::new(&self.context, 64).into()).into(),
-                self.unknown_location(),
-            ),
+            ast::Expr::Number(n) => self.const_int(*n),
             ast::Expr::VarRef(name) => return self.compile_varref(block, name),
             ast::Expr::FunCall(fexpr, arg_exprs) => {
                 return self.compile_funcall(block, fexpr, arg_exprs)
@@ -176,10 +168,29 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(block, val_expr)?;
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
-                //r#async::ReturnOp::builder(&self.context, self.unknown_location())
-                //    .operands(&[])
-                //    .build()
-                //    .into()
+            }
+            ast::Expr::Para(exprs) => {
+                let block = ir::Block::new(&[]);
+                for expr in exprs {
+                    self.compile_expr(&block, expr)?;
+                }
+                let zero = self.compile_number(&block, 0);
+                block.append_operation(
+                    r#async::YieldOp::builder(&self.context, self.unknown_location())
+                        .operands(&[val(&zero)])
+                        .build()
+                        .into(),
+                );
+                let region = ir::Region::new();
+                region.append_block(block);
+                r#async::ExecuteOp::builder(&self.context, self.unknown_location())
+                    .token(Type::parse(&self.context, "!async.token").unwrap())
+                    .body_results(&[Type::parse(&self.context, "!async.value<i64>").unwrap()])
+                    .dependencies(&[])
+                    .body_operands(&[])
+                    .body_region(region)
+                    .build()
+                    .into()
             }
             _ => todo!("{:?}", expr),
         };
@@ -236,6 +247,18 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             todo!()
         };
         Ok(block.append_operation(op))
+    }
+
+    fn compile_number(&'run self, block: &'c ir::Block, n: i64) -> ir::OperationRef<'c, 'c> {
+        block.append_operation(self.const_int(n))
+    }
+
+    fn const_int(&'run self, n: i64) -> ir::Operation<'c> {
+        dialect::arith::constant(
+            &self.context,
+            IntegerAttribute::new(n, IntegerType::new(&self.context, 64).into()).into(),
+            self.unknown_location(),
+        )
     }
 
     fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::r#type::FunctionType> {
