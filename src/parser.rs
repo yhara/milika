@@ -6,7 +6,7 @@ use nom::{
     bytes::complete::{tag, take_till},
     character::complete::{alphanumeric1, multispace0, multispace1},
     combinator::eof,
-    multi::many0,
+    multi::{many0, separated_list0},
     number,
     sequence::{delimited, preceded, terminated},
     IResult,
@@ -137,14 +137,14 @@ fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 }
 
 fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, pos) = tag("return")(s)?;
+    let (s, _) = tag("return")(s)?;
     let (s, name) = multispace1(s)?;
     let (s, expr) = parse_expr(s)?;
     Ok((s, ast::Expr::Return(Box::new(expr))))
 }
 
 fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    alt((parse_number, parse_varref))(s)
+    alt((parse_funcall, alt((parse_number, parse_varref))))(s)
 }
 
 fn parse_number<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
@@ -156,6 +156,24 @@ fn parse_number<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, (name, _pos)) = parse_ident(s)?;
     Ok((s, ast::Expr::VarRef(name)))
+}
+
+fn parse_funcall<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, f) = parse_varref(s)?;
+    let (s, args) = parse_arg_list(s)?;
+    Ok((s, ast::Expr::FunCall(Box::new(f), args)))
+}
+
+fn parse_arg_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+    delimited(
+        tag("("),
+        delimited(multispace0, parse_args, multispace0),
+        tag(")"),
+    )(s)
+}
+
+fn parse_args<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+    separated_list0(delimited(multispace0, tag(","), multispace0), parse_expr)(s)
 }
 
 fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>, E> {
