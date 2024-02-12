@@ -1,30 +1,29 @@
 use crate::ast::{self, Spanned};
 use anyhow::{anyhow, Result};
+use ariadne::{Label, Report, ReportKind, Source};
 use nom::{
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{tag, take_till},
     character::complete::{alphanumeric1, multispace0, multispace1},
+    character::is_newline,
+    combinator::eof,
     multi::many0,
-    sequence::delimited,
+    sequence::{delimited, preceded},
     IResult,
 };
 use nom_locate::{self, position};
 type Span<'a> = nom_locate::LocatedSpan<&'a str>;
+type E<'a> = nom::error::VerboseError<Span<'a>>;
 
-//pub struct Parser<'a> {
-//    src: &'a str,
-//}
-//
-//impl<'a> Parser<'a> {
-//    pub fn new(src: &str) -> Parser {
-//        Parser { src }
-//    }
-//
-//    pub fn parse(&self) -> Result<ast::Program<'a>> {
-//        let input = nom_locate::LocatedSpan::new(self.src);
-//        let (_, prog) = parse_decls(input)?;
-//        Ok(prog)
-//    }
+//fn render_parse_error(src: &str, span: std::ops::Range<usize>, msg: String) -> String {
+//    let mut rendered = vec![];
+//    Report::build(ReportKind::Error, "", span.start)
+//        .with_message(msg.clone())
+//        .with_label(Label::new(("", span)).with_message(msg))
+//        .finish()
+//        .write(("", Source::from(src)), &mut rendered)
+//        .unwrap();
+//    String::from_utf8_lossy(&rendered).to_string()
 //}
 
 pub fn parse(src: &str) -> Result<ast::Program> {
@@ -33,16 +32,32 @@ pub fn parse(src: &str) -> Result<ast::Program> {
     Ok(prog)
 }
 
-pub fn parse_decls(s: Span) -> IResult<Span, Vec<ast::Declaration>> {
-    Ok((s, Default::default()))
-    //many0(parse_decl)(s)
+fn parse_decls(s: Span) -> IResult<Span, Vec<ast::Declaration>, E> {
+    let (s, decls) = many0(delimited(parse_comments, parse_decl, parse_comments))(s)?;
+    let (s, _) = multispace0(s)?;
+    let (s, _) = eof(s)?;
+    Ok((s, decls))
+    //Ok((s, Default::default()))
 }
 
-fn parse_decl<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>> {
-    alt((parse_extern, parse_function))(s)
+fn parse_comments(s: Span) -> IResult<Span, (), E> {
+    let (s, _) = multispace0(s)?;
+    let (s, _) = many0(delimited(multispace0, parse_comment, multispace0))(s)?;
+    Ok((s, ()))
 }
 
-fn parse_extern<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>> {
+fn parse_comment(s: Span) -> IResult<Span, (), E> {
+    let (s, _) = tag("#")(s)?;
+    let (s, _) = take_till(|c| c == '\n')(s)?;
+    Ok((s, ()))
+}
+
+fn parse_decl<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>, E> {
+    parse_extern(s)
+    //alt((parse_extern, parse_function))(s)
+}
+
+fn parse_extern<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>, E> {
     let (s, _) = tag("extern")(s)?;
     let (s, _) = multispace1(s)?;
     let (s, (name, pos)) = parse_ident(s)?;
@@ -53,6 +68,7 @@ fn parse_extern<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>> {
     )(s)?;
     let (s, _) = delimited(multispace0, tag("->"), multispace0)(s)?;
     let (s, (ret_ty, _)) = parse_ty(s)?;
+    let (s, _) = preceded(multispace0, tag(";"))(s)?;
     let e = ast::Extern {
         is_async: false,
         name,
@@ -62,26 +78,33 @@ fn parse_extern<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>> {
     Ok((s, ast::Declaration::Extern((e, pos))))
 }
 
-fn parse_function<'a>(_s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>> {
-    todo!()
+//fn parse_function<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>> {
+//    tag("fun")(s)
+//}
+
+fn parse_params<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Param>, E> {
+    many0(delimited(multispace0, parse_param, multispace0))(s)
 }
 
-fn parse_params<'a>(_s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Param>> {
-    todo!()
+fn parse_param<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Param, E> {
+    let (s, (ty, _)) = parse_ty(s)?;
+    let (s, _) = multispace1(s)?;
+    let (s, (name, _)) = parse_ident(s)?;
+    Ok((s, ast::Param { ty, name }))
 }
 
-fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Expr>> {
+fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Expr>, E> {
     let (s, (name, pos)) = parse_ident(s)?;
     Ok((s, (ast::Expr::VarRef(name), pos)))
 }
 
-fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>> {
+fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>, E> {
     let (s, pos) = position(s)?;
     let (s, name) = alphanumeric1(s)?;
     Ok((s, (name.to_string(), pos)))
 }
 
-fn parse_ty<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Ty>> {
+fn parse_ty<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Ty>, E> {
     let (s, pos) = position(s)?;
     let (s, name) = alphanumeric1(s)?;
     Ok((s, (ast::Ty::Raw(name.to_string()), pos)))
