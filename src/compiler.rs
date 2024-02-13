@@ -76,18 +76,21 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         //assert!(module.as_operation().verify());
 
         // Convert to LLVM Dialect
-        let pass_manager = PassManager::new(&self.context);
-        pass_manager.add_pass(pass::conversion::create_func_to_llvm());
-        pass_manager
-            .nested_under("func.func")
-            .add_pass(pass::conversion::create_arith_to_llvm());
-        pass_manager
-            .nested_under("func.func")
-            .add_pass(pass::conversion::create_index_to_llvm());
-        pass_manager.add_pass(pass::conversion::create_scf_to_control_flow());
-        pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
-        pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
-        pass_manager.run(&mut module).unwrap();
+        //let pass_manager = PassManager::new(&self.context);
+        //pass_manager.add_pass(pass::r#async::create_async_func_to_async_runtime());
+        //pass_manager.add_pass(pass::r#async::create_async_to_async_runtime());
+        //pass_manager.add_pass(pass::conversion::create_async_to_llvm());
+        //pass_manager.add_pass(pass::conversion::create_func_to_llvm());
+        //pass_manager
+        //    .nested_under("func.func")
+        //    .add_pass(pass::conversion::create_arith_to_llvm());
+        //pass_manager
+        //    .nested_under("func.func")
+        //    .add_pass(pass::conversion::create_index_to_llvm());
+        //pass_manager.add_pass(pass::conversion::create_scf_to_control_flow());
+        //pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
+        //pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
+        //pass_manager.run(&mut module).unwrap();
         eprintln!("--CUTHERE--");
         module.as_operation().dump();
         assert!(module.as_operation().verify());
