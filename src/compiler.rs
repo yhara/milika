@@ -8,7 +8,7 @@ use melior::{
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
         r#type::{FunctionType, IntegerType, Type},
     },
-    pass::{self, PassManager},
+    //pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
 };
 use std::collections::HashMap;
@@ -57,7 +57,7 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
 
 impl<'run: 'c, 'c> Compiler<'run, 'c> {
     fn compile_program(&mut self, ast: ast::Program) -> Result<()> {
-        let mut module = ir::Module::new(self.unknown_location());
+        let module = ir::Module::new(self.unknown_location());
         let block = module.body();
 
         for decl in ast {

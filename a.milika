@@ -1,13 +1,6 @@
 extern putchar(int n) -> int;
 
 fun main() -> int {
-  para {
-    putchar(65);
-    putchar(66);
-    putchar(67);
-  };
-  putchar(68);
-  putchar(69);
-  putchar(70);
+  putchar(60 + 8);
   return 0;
 }

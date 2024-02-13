@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
-    character::complete::{alphanumeric1, multispace0, multispace1},
+    character::complete::{alphanumeric1, multispace0, multispace1, one_of},
     combinator::eof,
     multi::{many0, separated_list0},
     number,
@@ -138,12 +138,42 @@ fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 
 fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, _) = tag("return")(s)?;
-    let (s, name) = multispace1(s)?;
+    let (s, _) = multispace1(s)?;
     let (s, expr) = parse_expr(s)?;
     Ok((s, ast::Expr::Return(Box::new(expr))))
 }
 
 fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    alt((
+        parse_additive,
+        alt((
+            parse_para,
+            alt((parse_funcall, alt((parse_number, parse_varref)))),
+        )),
+    ))(s)
+}
+
+fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, left) = parse_multiplicative(s)?;
+    let (s, op) = delimited(multispace1, one_of("+-"), multispace1)(s)?;
+    let (s, right) = parse_multiplicative(s)?;
+    Ok((
+        s,
+        ast::Expr::OpCall(op.to_string(), Box::new(left), Box::new(right)),
+    ))
+}
+
+fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, left) = parse_atomic(s)?;
+    let (s, op) = delimited(multispace1, one_of("*/"), multispace1)(s)?;
+    let (s, right) = parse_atomic(s)?;
+    Ok((
+        s,
+        ast::Expr::OpCall(op.to_string(), Box::new(left), Box::new(right)),
+    ))
+}
+
+fn parse_atomic<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     alt((
         parse_para,
         alt((parse_funcall, alt((parse_number, parse_varref)))),
@@ -152,7 +182,7 @@ fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 
 fn parse_para<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, _) = tag("para")(s)?;
-    let (s, name) = multispace1(s)?;
+    let (s, _) = multispace1(s)?;
     let (s, exprs) = parse_block(s)?;
     Ok((s, ast::Expr::Para(exprs)))
 }

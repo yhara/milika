@@ -48,3 +48,7 @@ task :hand do
     #--reconcile-unrealized-casts \
   sh "mlir-translate --mlir-to-llvmir a2.mlir > a.ll"
 end
+
+task :cpp do
+  sh "clang++ -std=c++20 -c -emit-llvm a.cpp"
+end

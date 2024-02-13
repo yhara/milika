@@ -27,14 +27,14 @@ impl Extern {
         }
     }
 
-    pub fn into_empty_func(self) -> Function {
-        Function {
-            name: self.name,
-            params: self.params,
-            ret_ty: self.ret_ty,
-            body_stmts: Default::default(),
-        }
-    }
+    //pub fn into_empty_func(self) -> Function {
+    //    Function {
+    //        name: self.name,
+    //        params: self.params,
+    //        ret_ty: self.ret_ty,
+    //        body_stmts: Default::default(),
+    //    }
+    //}
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -62,12 +62,12 @@ pub struct Param {
 }
 
 impl Param {
-    pub fn new(ty: Ty, name: &str) -> Param {
-        Param {
-            ty,
-            name: name.to_string(),
-        }
-    }
+    //pub fn new(ty: Ty, name: &str) -> Param {
+    //    Param {
+    //        ty,
+    //        name: name.to_string(),
+    //    }
+    //}
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -77,9 +77,9 @@ pub enum Ty {
 }
 
 impl Ty {
-    pub fn raw(name: &str) -> Ty {
-        Ty::Raw(name.to_string())
-    }
+    //pub fn raw(name: &str) -> Ty {
+    //    Ty::Raw(name.to_string())
+    //}
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -103,7 +103,7 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn var_ref(name: impl Into<String>) -> Expr {
-        Expr::VarRef(name.into())
-    }
+    //pub fn var_ref(name: impl Into<String>) -> Expr {
+    //    Expr::VarRef(name.into())
+    //}
 }
