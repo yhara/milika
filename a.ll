@@ -8,16 +8,17 @@ declare void @free(ptr)
 declare i64 @putchar(i64)
 
 define i64 @main() {
-  br i1 true, label %1, label %3
+  br i1 false, label %1, label %3
 
 1:                                                ; preds = %0
   %2 = call i64 @putchar(i64 86)
-  br label %4
+  br label %5
 
 3:                                                ; preds = %0
-  br label %4
+  %4 = call i64 @putchar(i64 74)
+  br label %5
 
-4:                                                ; preds = %1, %3
+5:                                                ; preds = %1, %3
   ret i64 0
 }
 

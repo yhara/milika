@@ -3,7 +3,7 @@ module attributes {llvm.data_layout = ""} {
   llvm.func @main() -> i64 attributes {sym_visibility = "private"} {
     %0 = llvm.mlir.constant(1 : i64) : i64
     %1 = llvm.mlir.constant(1 : i64) : i64
-    %2 = llvm.mlir.constant(true) : i1
+    %2 = llvm.mlir.constant(false) : i1
     llvm.cond_br %2, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %3 = llvm.mlir.addressof @putchar : !llvm.ptr
@@ -13,10 +13,15 @@ module attributes {llvm.data_layout = ""} {
     %7 = llvm.call %3(%6) : !llvm.ptr, (i64) -> i64
     llvm.br ^bb3
   ^bb2:  // pred: ^bb0
+    %8 = llvm.mlir.addressof @putchar : !llvm.ptr
+    %9 = llvm.mlir.constant(80 : i64) : i64
+    %10 = llvm.mlir.constant(6 : i64) : i64
+    %11 = llvm.mlir.constant(74 : i64) : i64
+    %12 = llvm.call %8(%11) : !llvm.ptr, (i64) -> i64
     llvm.br ^bb3
   ^bb3:  // 2 preds: ^bb1, ^bb2
-    %8 = llvm.mlir.constant(0 : i64) : i64
-    llvm.return %8 : i64
+    %13 = llvm.mlir.constant(0 : i64) : i64
+    llvm.return %13 : i64
   }
   llvm.func @mlirAsyncRuntimeAddRef(!llvm.ptr, i64) attributes {sym_visibility = "private"}
   llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64) attributes {sym_visibility = "private"}
