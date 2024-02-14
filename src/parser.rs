@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
-    character::complete::{alphanumeric1, multispace0, multispace1, one_of},
+    character::complete::{alphanumeric1, multispace0, multispace1},
     combinator::{eof, opt},
     multi::{many0, separated_list0},
     number,
@@ -184,12 +184,12 @@ fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 }
 
 fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, left) = parse_atomic(s)?;
+    let (s, left) = parse_multiplicative(s)?;
     let (s, _) = multispace0(s)?;
     let (s, chain) = many0(separated_pair(
         alt((tag("+"), tag("-"))),
         multispace0,
-        parse_atomic,
+        parse_multiplicative,
     ))(s)?;
     Ok((s, build_op_calls(left, chain)))
 }
