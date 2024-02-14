@@ -120,7 +120,6 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     ) -> Result<ir::Operation> {
         let block = self.create_main_block(&f)?;
         for stmt in &f.body_stmts {
-            //block.append_operation(self.compile_expr(&block, stmt)?);
             self.compile_expr(&block, stmt)?;
         }
 
@@ -169,6 +168,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             ast::Expr::FunCall(fexpr, arg_exprs) => {
                 return self.compile_funcall(block, fexpr, arg_exprs)
             }
+            ast::Expr::If(cond, then, els) => return self.compile_if(block, cond, then, els),
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(block, val_expr)?;
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
@@ -213,9 +213,35 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             "-" => dialect::arith::subi,
             "*" => dialect::arith::muli,
             "/" => dialect::arith::divsi,
-            _ => panic!("unkown operator"),
+            _ => return self.compile_cmp(block, operator, lhs, rhs),
         };
         let op = f(
+            val(&self.compile_expr(block, lhs)?),
+            val(&self.compile_expr(block, rhs)?),
+            self.unknown_location(),
+        );
+        Ok(block.append_operation(op))
+    }
+
+    fn compile_cmp(
+        &'run self,
+        block: &'c ir::Block,
+        operator: &str,
+        lhs: &ast::Expr,
+        rhs: &ast::Expr,
+    ) -> Result<ir::OperationRef<'c, 'c>> {
+        let pred = match operator {
+            "==" => dialect::arith::CmpiPredicate::Eq,
+            "!=" => dialect::arith::CmpiPredicate::Ne,
+            "<" => dialect::arith::CmpiPredicate::Ult,
+            "<=" => dialect::arith::CmpiPredicate::Ule,
+            ">" => dialect::arith::CmpiPredicate::Ugt,
+            ">=" => dialect::arith::CmpiPredicate::Uge,
+            _ => panic!("unkown operator"),
+        };
+        let op = dialect::arith::cmpi(
+            &self.context,
+            pred,
             val(&self.compile_expr(block, lhs)?),
             val(&self.compile_expr(block, rhs)?),
             self.unknown_location(),
@@ -257,6 +283,26 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
+    fn compile_if(
+        &'run self,
+        block: &'c ir::Block,
+        cond_expr: &ast::Expr,
+        then: &[ast::Expr],
+        els: &Option<Vec<ast::Expr>>,
+    ) -> Result<ir::OperationRef<'c, 'c>> {
+        let cond_result = self.compile_cmp(block, "!=", cond_expr, &ast::Expr::Number(0))?;
+        let then_region = self.compile_exprs(then)?;
+        let else_region = self.compile_exprs(if let Some(v) = els { v } else { &[] })?;
+        let op = dialect::scf::r#if(
+            val(&cond_result),
+            Default::default(),
+            then_region,
+            else_region,
+            self.unknown_location(),
+        );
+        Ok(block.append_operation(op))
+    }
+
     fn compile_varref(
         &'run self,
         block: &'c ir::Block,
@@ -277,6 +323,16 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
 
     fn compile_number(&'run self, block: &'c ir::Block, n: i64) -> ir::OperationRef<'c, 'c> {
         block.append_operation(self.const_int(n))
+    }
+
+    fn compile_exprs(&'run self, exprs: &[ast::Expr]) -> Result<ir::Region> {
+        let block = ir::Block::new(&[]);
+        for expr in exprs {
+            self.compile_expr(&block, expr)?;
+        }
+        let region = ir::Region::new();
+        region.append_block(block);
+        Ok(region)
     }
 
     fn const_int(&'run self, n: i64) -> ir::Operation<'c> {

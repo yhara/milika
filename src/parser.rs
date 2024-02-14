@@ -5,7 +5,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
     character::complete::{alphanumeric1, multispace0, multispace1, one_of},
-    combinator::eof,
+    combinator::{eof, opt},
     multi::{many0, separated_list0},
     number,
     sequence::{delimited, preceded, separated_pair, terminated},
@@ -131,7 +131,7 @@ fn parse_block<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
 /// An expr terminated with ';'
 fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     terminated(
-        alt((parse_return, parse_expr)),
+        alt((parse_return, alt((parse_if, parse_expr)))),
         terminated(multispace0, tag(";")),
     )(s)
 }
@@ -143,13 +143,53 @@ fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     Ok((s, ast::Expr::Return(Box::new(expr))))
 }
 
+fn parse_if<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, _) = tag("if")(s)?;
+    let (s, cond) = delimited(
+        multispace0,
+        delimited(
+            tag("("),
+            delimited(multispace0, parse_expr, multispace0),
+            tag(")"),
+        ),
+        multispace0,
+    )(s)?;
+    let (s, then) = parse_block(s)?;
+    let (s, _) = multispace0(s)?;
+    let (s, els) = opt(parse_else)(s)?;
+    Ok((s, ast::Expr::If(Box::new(cond), then, els)))
+}
+
+fn parse_else<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+    let (s, _) = tag("else")(s)?;
+    let (s, _) = multispace0(s)?;
+    parse_block(s)
+}
+
 fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, left) = parse_multiplicative(s)?;
+    let (s, left) = parse_additive(s)?;
     let (s, _) = multispace0(s)?;
     let (s, chain) = many0(separated_pair(
-        one_of("+-"),
+        alt((
+            tag("=="),
+            alt((
+                tag("!="),
+                alt((tag("<"), alt((tag("<="), alt((tag(">"), tag(">="))))))),
+            )),
+        )),
         multispace0,
-        parse_multiplicative,
+        parse_additive,
+    ))(s)?;
+    Ok((s, build_op_calls(left, chain)))
+}
+
+fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, left) = parse_atomic(s)?;
+    let (s, _) = multispace0(s)?;
+    let (s, chain) = many0(separated_pair(
+        alt((tag("+"), tag("-"))),
+        multispace0,
+        parse_atomic,
     ))(s)?;
     Ok((s, build_op_calls(left, chain)))
 }
@@ -157,11 +197,15 @@ fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, left) = parse_atomic(s)?;
     let (s, _) = multispace0(s)?;
-    let (s, chain) = many0(separated_pair(one_of("*/"), multispace0, parse_atomic))(s)?;
+    let (s, chain) = many0(separated_pair(
+        alt((tag("*"), tag("/"))),
+        multispace0,
+        parse_atomic,
+    ))(s)?;
     Ok((s, build_op_calls(left, chain)))
 }
 
-fn build_op_calls(expr: ast::Expr, chain: Vec<(char, ast::Expr)>) -> ast::Expr {
+fn build_op_calls(expr: ast::Expr, chain: Vec<(Span, ast::Expr)>) -> ast::Expr {
     chain.into_iter().fold(expr, |acc, (op, right)| {
         ast::Expr::OpCall(op.to_string(), Box::new(acc), Box::new(right))
     })
@@ -176,7 +220,7 @@ fn parse_atomic<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 
 fn parse_para<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, _) = tag("para")(s)?;
-    let (s, _) = multispace1(s)?;
+    let (s, _) = multispace0(s)?;
     let (s, exprs) = parse_block(s)?;
     Ok((s, ast::Expr::Para(exprs)))
 }
