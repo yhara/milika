@@ -291,8 +291,8 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         els: &Option<Vec<ast::Expr>>,
     ) -> Result<ir::OperationRef<'c, 'c>> {
         let cond_result = self.compile_expr(block, cond_expr)?;
-        let then_region = self.compile_exprs(then)?;
-        let else_region = self.compile_exprs(if let Some(v) = els { v } else { &[] })?;
+        let then_region = self.compile_exprs(then, true)?;
+        let else_region = self.compile_exprs(if let Some(v) = els { v } else { &[] }, true)?;
         let op = dialect::scf::r#if(
             val(&cond_result),
             Default::default(),
@@ -325,10 +325,15 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         block.append_operation(self.const_int(n))
     }
 
-    fn compile_exprs(&'run self, exprs: &[ast::Expr]) -> Result<ir::Region> {
+    /// Returns a newly created region that contains `exprs`.
+    fn compile_exprs(&'run self, exprs: &[ast::Expr], terminate: bool) -> Result<ir::Region> {
         let block = ir::Block::new(&[]);
         for expr in exprs {
             self.compile_expr(&block, expr)?;
+        }
+        if terminate {
+            let op = dialect::scf::r#yield(&[], self.unknown_location());
+            block.append_operation(op);
         }
         let region = ir::Region::new();
         region.append_block(block);
