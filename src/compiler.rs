@@ -165,6 +165,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         let op = match expr {
             ast::Expr::Number(n) => self.const_int(*n),
             ast::Expr::VarRef(name) => return self.compile_varref(block, name),
+            ast::Expr::OpCall(op, lhs, rhs) => return self.compile_op_call(block, op, lhs, rhs),
             ast::Expr::FunCall(fexpr, arg_exprs) => {
                 return self.compile_funcall(block, fexpr, arg_exprs)
             }
@@ -197,6 +198,28 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             }
             _ => todo!("{:?}", expr),
         };
+        Ok(block.append_operation(op))
+    }
+
+    fn compile_op_call(
+        &'run self,
+        block: &'c ir::Block,
+        operator: &str,
+        lhs: &ast::Expr,
+        rhs: &ast::Expr,
+    ) -> Result<ir::OperationRef<'c, 'c>> {
+        let f = match operator {
+            "+" => dialect::arith::addi,
+            "-" => dialect::arith::subi,
+            "*" => dialect::arith::muli,
+            "/" => dialect::arith::divsi,
+            _ => panic!("unkown operator"),
+        };
+        let op = f(
+            val(&self.compile_expr(block, lhs)?),
+            val(&self.compile_expr(block, rhs)?),
+            self.unknown_location(),
+        );
         Ok(block.append_operation(op))
     }
 

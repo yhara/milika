@@ -145,10 +145,10 @@ fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 
 fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, left) = parse_multiplicative(s)?;
-    let (s, _) = multispace1(s)?;
+    let (s, _) = multispace0(s)?;
     let (s, chain) = many0(separated_pair(
         one_of("+-"),
-        multispace1,
+        multispace0,
         parse_multiplicative,
     ))(s)?;
     Ok((s, build_op_calls(left, chain)))
@@ -156,8 +156,8 @@ fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 
 fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, left) = parse_atomic(s)?;
-    let (s, _) = multispace1(s)?;
-    let (s, chain) = many0(separated_pair(one_of("*/"), multispace1, parse_atomic))(s)?;
+    let (s, _) = multispace0(s)?;
+    let (s, chain) = many0(separated_pair(one_of("*/"), multispace0, parse_atomic))(s)?;
     Ok((s, build_op_calls(left, chain)))
 }
 
