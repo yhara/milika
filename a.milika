@@ -1,6 +1,7 @@
 extern putchar(int n) -> int;
 
 fun main() -> int {
-  putchar(60 + 8);
-  return 0;
+  1 + 2;
+  #putchar(60 + 8);
+  #return 0;
 }

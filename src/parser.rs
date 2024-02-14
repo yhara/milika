@@ -8,7 +8,7 @@ use nom::{
     combinator::eof,
     multi::{many0, separated_list0},
     number,
-    sequence::{delimited, preceded, terminated},
+    sequence::{delimited, preceded, separated_pair, terminated},
     IResult,
 };
 use nom_locate::{self, position};
@@ -144,33 +144,27 @@ fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
 }
 
 fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    alt((
-        parse_additive,
-        alt((
-            parse_para,
-            alt((parse_funcall, alt((parse_number, parse_varref)))),
-        )),
-    ))(s)
-}
-
-fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, left) = parse_multiplicative(s)?;
-    let (s, op) = delimited(multispace1, one_of("+-"), multispace1)(s)?;
-    let (s, right) = parse_multiplicative(s)?;
-    Ok((
-        s,
-        ast::Expr::OpCall(op.to_string(), Box::new(left), Box::new(right)),
-    ))
+    let (s, _) = multispace1(s)?;
+    let (s, chain) = many0(separated_pair(
+        one_of("+-"),
+        multispace1,
+        parse_multiplicative,
+    ))(s)?;
+    Ok((s, build_op_calls(left, chain)))
 }
 
 fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, left) = parse_atomic(s)?;
-    let (s, op) = delimited(multispace1, one_of("*/"), multispace1)(s)?;
-    let (s, right) = parse_atomic(s)?;
-    Ok((
-        s,
-        ast::Expr::OpCall(op.to_string(), Box::new(left), Box::new(right)),
-    ))
+    let (s, _) = multispace1(s)?;
+    let (s, chain) = many0(separated_pair(one_of("*/"), multispace1, parse_atomic))(s)?;
+    Ok((s, build_op_calls(left, chain)))
+}
+
+fn build_op_calls(expr: ast::Expr, chain: Vec<(char, ast::Expr)>) -> ast::Expr {
+    chain.into_iter().fold(expr, |acc, (op, right)| {
+        ast::Expr::OpCall(op.to_string(), Box::new(acc), Box::new(right))
+    })
 }
 
 fn parse_atomic<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
