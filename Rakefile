@@ -21,6 +21,7 @@ file "a2.mlir" => ["a.mlir"] do
     --convert-arith-to-llvm \
     --convert-scf-to-cf \
     --convert-func-to-llvm \
+    --finalize-memref-to-llvm \
     < a.mlir > a2.mlir"
 end
 

@@ -131,9 +131,19 @@ fn parse_block<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
 /// An expr terminated with ';'
 fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     terminated(
-        alt((parse_return, alt((parse_if, parse_expr)))),
+        alt((
+            parse_alloc,
+            alt((parse_return, alt((parse_if, parse_expr)))),
+        )),
         terminated(multispace0, tag(";")),
     )(s)
+}
+
+fn parse_alloc<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, _) = tag("alloc")(s)?;
+    let (s, _) = multispace1(s)?;
+    let (s, (name, _pos)) = parse_ident(s)?;
+    Ok((s, ast::Expr::Alloc(name.to_string())))
 }
 
 fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {

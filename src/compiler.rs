@@ -6,7 +6,7 @@ use melior::{
     ir::{
         self,
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
-        r#type::{FunctionType, IntegerType, Type},
+        r#type::{FunctionType, IntegerType, MemRefType, Type},
     },
     //pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
@@ -169,6 +169,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
                 return self.compile_funcall(block, fexpr, arg_exprs)
             }
             ast::Expr::If(cond, then, els) => return self.compile_if(block, cond, then, els),
+            ast::Expr::Alloc(name) => return self.compile_alloc(block, name),
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(block, val_expr)?;
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
@@ -303,6 +304,22 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
+    fn compile_alloc(
+        &'run self,
+        block: &'c ir::Block,
+        name: &str,
+    ) -> Result<ir::OperationRef<'c, 'c>> {
+        let op = dialect::memref::alloca(
+            &self.context,
+            MemRefType::new(self.i64_type().into(), &[], None, None),
+            &[],
+            &[],
+            None,
+            self.unknown_location(),
+        );
+        Ok(block.append_operation(op))
+    }
+
     fn compile_varref(
         &'run self,
         block: &'c ir::Block,
@@ -362,12 +379,16 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         let t = match ty {
             ast::Ty::Raw(s) => match &s[..] {
                 "none" => Type::none(&self.context).into(),
-                "int" => ir::r#type::IntegerType::new(&self.context, 64).into(),
+                "int" => self.i64_type().into(),
                 _ => return Err(anyhow!("unknown type `{}'", s)),
             },
             ast::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
         Ok(t)
+    }
+
+    fn i64_type(&self) -> ir::r#type::IntegerType {
+        ir::r#type::IntegerType::new(&self.context, 64)
     }
 
     fn identifier(&self, s: &str) -> ir::Identifier {

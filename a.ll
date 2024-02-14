@@ -8,17 +8,21 @@ declare void @free(ptr)
 declare i64 @putchar(i64)
 
 define i64 @main() {
-  br i1 false, label %1, label %3
+  %1 = alloca i64, i64 1, align 8
+  %2 = insertvalue { ptr, ptr, i64 } undef, ptr %1, 0
+  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1
+  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2
+  br i1 false, label %5, label %7
 
-1:                                                ; preds = %0
-  %2 = call i64 @putchar(i64 86)
-  br label %5
+5:                                                ; preds = %0
+  %6 = call i64 @putchar(i64 86)
+  br label %9
 
-3:                                                ; preds = %0
-  %4 = call i64 @putchar(i64 74)
-  br label %5
+7:                                                ; preds = %0
+  %8 = call i64 @putchar(i64 74)
+  br label %9
 
-5:                                                ; preds = %1, %3
+9:                                                ; preds = %5, %7
   ret i64 0
 }
 
