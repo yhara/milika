@@ -290,7 +290,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         then: &[ast::Expr],
         els: &Option<Vec<ast::Expr>>,
     ) -> Result<ir::OperationRef<'c, 'c>> {
-        let cond_result = self.compile_cmp(block, "!=", cond_expr, &ast::Expr::Number(0))?;
+        let cond_result = self.compile_expr(block, cond_expr)?;
         let then_region = self.compile_exprs(then)?;
         let else_region = self.compile_exprs(if let Some(v) = els { v } else { &[] })?;
         let op = dialect::scf::r#if(
