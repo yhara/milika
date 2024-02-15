@@ -132,11 +132,21 @@ fn parse_block<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
 fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     terminated(
         alt((
-            parse_alloc,
-            alt((parse_return, alt((parse_if, parse_expr)))),
+            parse_assign,
+            alt((
+                parse_alloc,
+                alt((parse_return, alt((parse_if, parse_expr)))),
+            )),
         )),
         terminated(multispace0, tag(";")),
     )(s)
+}
+
+fn parse_assign<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, (name, _pos)) = parse_ident(s)?;
+    let (s, _) = delimited(multispace0, tag("="), multispace0)(s)?;
+    let (s, rhs) = preceded(multispace0, parse_expr)(s)?;
+    Ok((s, ast::Expr::Assign(name.to_string(), Box::new(rhs))))
 }
 
 fn parse_alloc<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {

@@ -34,6 +34,7 @@ struct Compiler<'run: 'c, 'c> {
     src: &'run str,
     context: &'c melior::Context,
     sigs: HashMap<String, ast::FunTy>,
+    lvars: HashMap<String, ir::Value<'c, 'c>>,
 }
 
 pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
@@ -50,6 +51,7 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
         src,
         context: &context,
         sigs: gather_sigs(&ast)?,
+        lvars: Default::default(),
     };
     c.compile_program(ast)?;
     Ok(())
@@ -113,11 +115,12 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     }
 
     fn compile_func(
-        &self,
+        &mut self,
         f: ast::Function,
         span: ast::Span,
         is_extern: bool,
     ) -> Result<ir::Operation> {
+        self.lvars.clear();
         let block = self.create_main_block(&f)?;
         for stmt in &f.body_stmts {
             self.compile_expr(&block, stmt)?;
@@ -157,7 +160,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     }
 
     fn compile_expr(
-        &'run self,
+        &'run mut self,
         block: &'c ir::Block,
         expr: &ast::Expr,
     ) -> Result<ir::OperationRef<'c, 'c>> {
@@ -170,6 +173,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             }
             ast::Expr::If(cond, then, els) => return self.compile_if(block, cond, then, els),
             ast::Expr::Alloc(name) => return self.compile_alloc(block, name),
+            ast::Expr::Assign(name, rhs) => return self.compile_assign(block, name, rhs),
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(block, val_expr)?;
                 dialect::func::r#return(&[val(&v)], self.unknown_location())
@@ -305,7 +309,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     }
 
     fn compile_alloc(
-        &'run self,
+        &'run mut self,
         block: &'c ir::Block,
         name: &str,
     ) -> Result<ir::OperationRef<'c, 'c>> {
@@ -315,6 +319,26 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
             &[],
             &[],
             None,
+            self.unknown_location(),
+        );
+        let r = block.append_operation(op);
+        self.lvars.insert(name.to_string(), val(&r));
+        Ok(r)
+    }
+
+    fn compile_assign(
+        &'run self,
+        block: &'c ir::Block,
+        name: &str,
+        rhs: &ast::Expr,
+    ) -> Result<ir::OperationRef<'c, 'c>> {
+        let Some(lvar) = self.lvars.get(name) else {
+            return Err(anyhow!("unknown lvar {name}"));
+        };
+        let op = dialect::memref::store(
+            val(&self.compile_expr(block, rhs)?),
+            *lvar,
+            &[],
             self.unknown_location(),
         );
         Ok(block.append_operation(op))
