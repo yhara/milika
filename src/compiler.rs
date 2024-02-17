@@ -29,13 +29,13 @@ fn val<'c, 'a>(x: &'a ir::OperationRef<'c, 'a>) -> ir::Value<'c, 'a> {
 //    v
 //}
 
-struct Ctx<'c> {
-    lvars: HashMap<String, ir::Value<'c, 'c>>,
+struct Ctx<'c, 'a> {
+    lvars: HashMap<String, ir::Value<'c, 'a>>,
 }
 
-struct Compiler<'run: 'c, 'c> {
-    filename: &'run str,
-    src: &'run str,
+struct Compiler<'c> {
+    filename: &'c str,
+    src: &'c str,
     context: &'c melior::Context,
     sigs: HashMap<String, ast::FunTy>,
 }
@@ -59,8 +59,8 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
     Ok(())
 }
 
-impl<'run: 'c, 'c> Compiler<'run, 'c> {
-    fn compile_program(&'run self, ast: ast::Program) -> Result<()> {
+impl<'c> Compiler<'c> {
+    fn compile_program(&'c self, ast: ast::Program) -> Result<()> {
         let module = ir::Module::new(self.unknown_location());
         let block = module.body();
 
@@ -101,7 +101,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(())
     }
 
-    fn compile_extern(&self, ext: ast::Extern, span: ast::Span) -> Result<ir::Operation> {
+    fn compile_extern(&'c self, ext: ast::Extern, span: ast::Span) -> Result<ir::Operation> {
         let attrs = vec![(
             self.identifier("sym_visibility"),
             self.str_attr("private").into(),
@@ -163,12 +163,12 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(ir::Block::new(&param_tys))
     }
 
-    fn compile_expr<'f>(
-        &'run self,
-        block: &'c ir::Block<'c>,
-        ctx: &'f mut Ctx<'c>,
+    fn compile_expr<'a>(
+        &'c self,
+        block: &'a ir::Block<'c>,
+        ctx: &mut Ctx<'c, 'a>,
         expr: &ast::Expr,
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let op = match expr {
             ast::Expr::Number(n) => self.const_int(*n),
             ast::Expr::VarRef(name) => return self.compile_varref(block, name),
@@ -213,14 +213,14 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
-    fn compile_op_call<'f>(
-        &'run self,
-        block: &'c ir::Block,
-        ctx: &'f mut Ctx<'c>,
+    fn compile_op_call<'f, 'a>(
+        &'c self,
+        block: &'a ir::Block<'c>,
+        ctx: &'f mut Ctx<'c, 'a>,
         operator: &str,
         lhs: &ast::Expr,
         rhs: &ast::Expr,
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let f = match operator {
             "+" => dialect::arith::addi,
             "-" => dialect::arith::subi,
@@ -236,14 +236,14 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
-    fn compile_cmp<'f>(
-        &'run self,
-        block: &'c ir::Block,
-        ctx: &'f mut Ctx<'c>,
+    fn compile_cmp<'f, 'a>(
+        &'c self,
+        block: &'a ir::Block<'c>,
+        ctx: &'f mut Ctx<'c, 'a>,
         operator: &str,
         lhs: &ast::Expr,
         rhs: &ast::Expr,
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let pred = match operator {
             "==" => dialect::arith::CmpiPredicate::Eq,
             "!=" => dialect::arith::CmpiPredicate::Ne,
@@ -263,13 +263,13 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
-    fn compile_funcall<'f>(
-        &'run self,
-        block: &'c ir::Block,
-        ctx: &'f mut Ctx<'c>,
+    fn compile_funcall<'f, 'a>(
+        &'c self,
+        block: &'a ir::Block<'c>,
+        ctx: &'f mut Ctx<'c, 'a>,
         fexpr: &ast::Expr,
         arg_exprs: &[ast::Expr],
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let fun_ty = match fexpr {
             ast::Expr::VarRef(s) => {
                 if let Some(t) = self.sigs.get(s) {
@@ -299,7 +299,7 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     }
 
     //    fn compile_if<'f>(
-    //        &'run self,
+    //        &'c self,
     //        block: &'c ir::Block,
     //        ctx: &'f mut Ctx<'c>,
     //        cond_expr: &ast::Expr,
@@ -319,12 +319,12 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
     //        Ok(block.append_operation(op))
     //    }
 
-    fn compile_alloc<'f>(
+    fn compile_alloc<'f, 'a>(
         &'c self,
-        block: &'c ir::Block<'c>,
-        ctx: &'f mut Ctx<'c>,
+        block: &'a ir::Block<'c>,
+        ctx: &'f mut Ctx<'c, 'a>,
         name: &str,
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let op = dialect::memref::alloca(
             &self.context,
             MemRefType::new(self.i64_type().into(), &[], None, None),
@@ -339,13 +339,13 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(r)
     }
 
-    fn compile_assign<'f>(
-        &'run self,
-        block: &'c ir::Block<'c>,
-        ctx: &'f mut Ctx<'c>,
+    fn compile_assign<'f, 'a>(
+        &'c self,
+        block: &'a ir::Block<'c>,
+        ctx: &'f mut Ctx<'c, 'a>,
         name: &str,
         rhs: &ast::Expr,
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let rhs_result = self.compile_expr(block, ctx, rhs)?;
         let Some(lvar) = ctx.lvars.get(name) else {
             return Err(anyhow!("unknown lvar {name}"));
@@ -354,11 +354,11 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
-    fn compile_varref(
-        &'run self,
-        block: &'c ir::Block,
+    fn compile_varref<'a>(
+        &'c self,
+        block: &'a ir::Block<'c>,
         name: &str,
-    ) -> Result<ir::OperationRef<'c, 'c>> {
+    ) -> Result<ir::OperationRef<'c, 'a>> {
         let op = if let Some(fun_ty) = self.sigs.get(name) {
             dialect::func::constant(
                 &self.context,
@@ -372,31 +372,29 @@ impl<'run: 'c, 'c> Compiler<'run, 'c> {
         Ok(block.append_operation(op))
     }
 
-    fn compile_number(&'run self, block: &'c ir::Block<'c>, n: i64) -> ir::OperationRef<'c, 'c> {
+    fn compile_number(&'c self, block: &'c ir::Block<'c>, n: i64) -> ir::OperationRef<'c, 'c> {
         block.append_operation(self.const_int(n))
     }
 
-    /// Returns a newly created region that contains `exprs`.
-    fn compile_exprs<'f>(
-        &'run self,
-        ctx: &'f mut Ctx<'c>,
-        exprs: &[ast::Expr],
-        terminate: bool,
-    ) -> Result<ir::Region<'c>> {
-        let block = ir::Block::new(&[]);
-        for expr in exprs {
-            self.compile_expr(&block, ctx, expr)?;
-        }
-        if terminate {
-            let op = dialect::scf::r#yield(&[], self.unknown_location());
-            block.append_operation(op);
-        }
-        let region = ir::Region::new();
-        region.append_block(block);
-        Ok(region)
-    }
+    ///// Returns a newly created region that contains `exprs`.
+    //fn compile_exprs<'a>(
+    //    &'c self,
+    //    ctx: &mut Ctx<'c, 'a>,
+    //    exprs: &[ast::Expr],
+    //    terminate: bool,
+    //) -> Result<ir::Block<'c>> {
+    //    let block = ir::Block::new(&[]);
+    //    for expr in exprs {
+    //        self.compile_expr(&block, ctx, expr)?;
+    //    }
+    //    if terminate {
+    //        let op = dialect::scf::r#yield(&[], self.unknown_location());
+    //        block.append_operation(op);
+    //    }
+    //    Ok(block)
+    //}
 
-    fn const_int(&'run self, n: i64) -> ir::Operation<'c> {
+    fn const_int(&'c self, n: i64) -> ir::Operation<'c> {
         dialect::arith::constant(
             &self.context,
             IntegerAttribute::new(n, IntegerType::new(&self.context, 64).into()).into(),
