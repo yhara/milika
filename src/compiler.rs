@@ -439,7 +439,7 @@ impl<'c> Compiler<'c> {
     fn const_int(&self, n: i64) -> ir::Operation<'c> {
         dialect::arith::constant(
             &self.context,
-            IntegerAttribute::new(n, IntegerType::new(&self.context, 64).into()).into(),
+            IntegerAttribute::new(n, self.int_type().into()).into(),
             self.unknown_location(),
         )
     }
@@ -458,12 +458,16 @@ impl<'c> Compiler<'c> {
         let t = match ty {
             ast::Ty::Raw(s) => match &s[..] {
                 "none" => Type::none(&self.context).into(),
-                "int" => self.i64_type().into(),
+                "int" => self.int_type().into(),
                 _ => return Err(anyhow!("unknown type `{}'", s)),
             },
             ast::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
         Ok(t)
+    }
+
+    fn int_type(&self) -> ir::Type<'c> {
+        ir::Type::index(&self.context)
     }
 
     fn i64_type(&self) -> ir::r#type::IntegerType<'c> {
