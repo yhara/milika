@@ -12,6 +12,7 @@ use melior::{
     utility::{register_all_dialects, register_all_llvm_translations},
 };
 use std::collections::HashMap;
+use train_map::TrainMap;
 
 /// Get the first result value of an operation.
 /// Panics if the operation yields no value
@@ -21,17 +22,13 @@ fn val<'c, 'a>(x: &'a ir::OperationRef<'c, 'a>) -> ir::Value<'c, 'a> {
         .into()
 }
 
-//fn vals<'c>(xs: &'c [ir::OperationRef<'c, 'c>]) -> Vec<ir::Value<'c, 'c>> {
+//fn vals<'c>(xs: &'c [ir::OperationRef<'c, 'a>]) -> Vec<ir::Value<'c, 'a>> {
 //    let mut v = vec![];
 //    for x in xs {
 //        v.push(val(x));
 //    }
 //    v
 //}
-
-struct Ctx<'c, 'a> {
-    lvars: HashMap<String, ir::Value<'c, 'a>>,
-}
 
 struct Compiler<'c> {
     filename: &'c str,
@@ -60,7 +57,7 @@ pub fn run(filename: &str, src: &str, ast: ast::Program) -> Result<()> {
 }
 
 impl<'c> Compiler<'c> {
-    fn compile_program(&'c self, ast: ast::Program) -> Result<()> {
+    fn compile_program(&self, ast: ast::Program) -> Result<()> {
         let module = ir::Module::new(self.unknown_location());
         let block = module.body();
 
@@ -101,7 +98,7 @@ impl<'c> Compiler<'c> {
         Ok(())
     }
 
-    fn compile_extern(&'c self, ext: ast::Extern, span: ast::Span) -> Result<ir::Operation> {
+    fn compile_extern(&self, ext: ast::Extern, span: ast::Span) -> Result<ir::Operation> {
         let attrs = vec![(
             self.identifier("sym_visibility"),
             self.str_attr("private").into(),
@@ -117,17 +114,15 @@ impl<'c> Compiler<'c> {
     }
 
     fn compile_func(
-        &'c self,
+        &self,
         f: ast::Function,
         span: ast::Span,
         is_extern: bool,
     ) -> Result<ir::Operation<'c>> {
-        let mut ctx = Ctx {
-            lvars: Default::default(),
-        };
+        let mut lvars = TrainMap::new();
         let block = self.create_main_block(&f)?;
         for stmt in &f.body_stmts {
-            self.compile_expr(&block, &mut ctx, stmt)?;
+            self.compile_expr(&block, &mut lvars, stmt)?;
         }
 
         let region = ir::Region::new();
@@ -151,7 +146,7 @@ impl<'c> Compiler<'c> {
         ))
     }
 
-    fn create_main_block(&'c self, f: &ast::Function) -> Result<ir::Block<'c>> {
+    fn create_main_block(&self, f: &ast::Function) -> Result<ir::Block<'c>> {
         let param_tys = f
             .params
             .iter()
@@ -164,59 +159,31 @@ impl<'c> Compiler<'c> {
     }
 
     fn compile_expr<'a>(
-        &'c self,
+        &self,
         block: &'a ir::Block<'c>,
-        ctx: &mut Ctx<'c, 'a>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         expr: &ast::Expr,
     ) -> Result<ir::OperationRef<'c, 'a>> {
-        let op = match expr {
-            ast::Expr::Number(n) => self.const_int(*n),
-            ast::Expr::VarRef(name) => return self.compile_varref(block, name),
-            ast::Expr::OpCall(op, lhs, rhs) => {
-                return self.compile_op_call(block, ctx, op, lhs, rhs)
-            }
+        match expr {
+            ast::Expr::Number(n) => self.compile_number(block, *n),
+            ast::Expr::VarRef(name) => self.compile_varref(block, lvars, name),
+            ast::Expr::OpCall(op, lhs, rhs) => self.compile_op_call(block, lvars, op, lhs, rhs),
             ast::Expr::FunCall(fexpr, arg_exprs) => {
-                return self.compile_funcall(block, ctx, fexpr, arg_exprs)
+                self.compile_funcall(block, lvars, fexpr, arg_exprs)
             }
-            //ast::Expr::If(cond, then, els) => return self.compile_if(block, ctx, cond, then, els),
-            ast::Expr::Alloc(name) => return self.compile_alloc(block, ctx, name),
-            ast::Expr::Assign(name, rhs) => return self.compile_assign(block, ctx, name, rhs),
-            ast::Expr::Return(val_expr) => {
-                let v = self.compile_expr(block, ctx, val_expr)?;
-                dialect::func::r#return(&[val(&v)], self.unknown_location())
-            }
-            //            ast::Expr::Para(exprs) => {
-            //                let block = ir::Block::new(&[]);
-            //                for expr in exprs {
-            //                    self.compile_expr(&block, ctx, expr)?;
-            //                }
-            //                let zero = self.compile_number(&block, 0);
-            //                block.append_operation(
-            //                    r#async::YieldOp::builder(&self.context, self.unknown_location())
-            //                        .operands(&[val(&zero)])
-            //                        .build()
-            //                        .into(),
-            //                );
-            //                let region = ir::Region::new();
-            //                region.append_block(block);
-            //                r#async::ExecuteOp::builder(&self.context, self.unknown_location())
-            //                    .token(Type::parse(&self.context, "!async.token").unwrap())
-            //                    .body_results(&[Type::parse(&self.context, "!async.value<i64>").unwrap()])
-            //                    .dependencies(&[])
-            //                    .body_operands(&[])
-            //                    .body_region(region)
-            //                    .build()
-            //                    .into()
-            //            }
+            ast::Expr::If(cond, then, els) => self.compile_if(block, lvars, cond, then, els),
+            ast::Expr::Alloc(name) => self.compile_alloc(block, lvars, name),
+            ast::Expr::Assign(name, rhs) => self.compile_assign(block, lvars, name, rhs),
+            ast::Expr::Return(val_expr) => self.compile_return(block, lvars, val_expr),
+            //ast::Expr::Para(exprs) => self.compile_para(block, lvars, exprs),
             _ => todo!("{:?}", expr),
-        };
-        Ok(block.append_operation(op))
+        }
     }
 
-    fn compile_op_call<'f, 'a>(
-        &'c self,
+    fn compile_op_call<'a>(
+        &self,
         block: &'a ir::Block<'c>,
-        ctx: &'f mut Ctx<'c, 'a>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         operator: &str,
         lhs: &ast::Expr,
         rhs: &ast::Expr,
@@ -226,20 +193,20 @@ impl<'c> Compiler<'c> {
             "-" => dialect::arith::subi,
             "*" => dialect::arith::muli,
             "/" => dialect::arith::divsi,
-            _ => return self.compile_cmp(block, ctx, operator, lhs, rhs),
+            _ => return self.compile_cmp(block, lvars, operator, lhs, rhs),
         };
         let op = f(
-            val(&self.compile_expr(block, ctx, lhs)?),
-            val(&self.compile_expr(block, ctx, rhs)?),
+            val(&self.compile_expr(block, lvars, lhs)?),
+            val(&self.compile_expr(block, lvars, rhs)?),
             self.unknown_location(),
         );
         Ok(block.append_operation(op))
     }
 
-    fn compile_cmp<'f, 'a>(
-        &'c self,
+    fn compile_cmp<'a>(
+        &self,
         block: &'a ir::Block<'c>,
-        ctx: &'f mut Ctx<'c, 'a>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         operator: &str,
         lhs: &ast::Expr,
         rhs: &ast::Expr,
@@ -256,17 +223,17 @@ impl<'c> Compiler<'c> {
         let op = dialect::arith::cmpi(
             &self.context,
             pred,
-            val(&self.compile_expr(block, ctx, lhs)?),
-            val(&self.compile_expr(block, ctx, rhs)?),
+            val(&self.compile_expr(block, lvars, lhs)?),
+            val(&self.compile_expr(block, lvars, rhs)?),
             self.unknown_location(),
         );
         Ok(block.append_operation(op))
     }
 
-    fn compile_funcall<'f, 'a>(
-        &'c self,
+    fn compile_funcall<'a>(
+        &self,
         block: &'a ir::Block<'c>,
-        ctx: &'f mut Ctx<'c, 'a>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         fexpr: &ast::Expr,
         arg_exprs: &[ast::Expr],
     ) -> Result<ir::OperationRef<'c, 'a>> {
@@ -281,11 +248,11 @@ impl<'c> Compiler<'c> {
             _ => return Err(anyhow!("not a function?")),
         };
 
-        let f = self.compile_expr(block, ctx, fexpr)?;
+        let f = self.compile_expr(block, lvars, fexpr)?;
 
         let mut args = vec![];
         for e in arg_exprs {
-            args.push(self.compile_expr(block, ctx, e)?.result(0)?.into());
+            args.push(self.compile_expr(block, lvars, e)?.result(0)?.into());
         }
 
         let result_types = fun_ty
@@ -298,31 +265,43 @@ impl<'c> Compiler<'c> {
         Ok(block.append_operation(op))
     }
 
-    //    fn compile_if<'f>(
-    //        &'c self,
-    //        block: &'c ir::Block,
-    //        ctx: &'f mut Ctx<'c>,
-    //        cond_expr: &ast::Expr,
-    //        then: &[ast::Expr],
-    //        els: &Option<Vec<ast::Expr>>,
-    //    ) -> Result<ir::OperationRef<'c, 'c>> {
-    //        let cond_result = self.compile_expr(block, ctx, cond_expr)?;
-    //        let then_region = self.compile_exprs(ctx, then, true)?;
-    //        let else_region = self.compile_exprs(ctx, if let Some(v) = els { v } else { &[] }, true)?;
-    //        let op = dialect::scf::r#if(
-    //            val(&cond_result),
-    //            Default::default(),
-    //            then_region,
-    //            else_region,
-    //            self.unknown_location(),
-    //        );
-    //        Ok(block.append_operation(op))
-    //    }
-
-    fn compile_alloc<'f, 'a>(
-        &'c self,
+    fn compile_if<'a>(
+        &self,
         block: &'a ir::Block<'c>,
-        ctx: &'f mut Ctx<'c, 'a>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
+        cond_expr: &ast::Expr,
+        then: &[ast::Expr],
+        els: &Option<Vec<ast::Expr>>,
+    ) -> Result<ir::OperationRef<'c, 'a>> {
+        let cond_result = self.compile_expr(block, lvars, cond_expr)?;
+        let then_region = {
+            let region = ir::Region::new();
+            region.append_block(self.compile_exprs(lvars, then, true)?);
+            region
+        };
+        let else_region = {
+            let region = ir::Region::new();
+            region.append_block(self.compile_exprs(
+                lvars,
+                if let Some(v) = els { v } else { &[] },
+                true,
+            )?);
+            region
+        };
+        let op = dialect::scf::r#if(
+            val(&cond_result),
+            Default::default(),
+            then_region,
+            else_region,
+            self.unknown_location(),
+        );
+        Ok(block.append_operation(op))
+    }
+
+    fn compile_alloc<'a>(
+        &self,
+        block: &'a ir::Block<'c>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         name: &str,
     ) -> Result<ir::OperationRef<'c, 'a>> {
         let op = dialect::memref::alloca(
@@ -335,28 +314,40 @@ impl<'c> Compiler<'c> {
         );
         let r = block.append_operation(op);
         let tmp = r.result(0).unwrap().into();
-        ctx.lvars.insert(name.to_string(), tmp);
+        lvars.insert(name.to_string(), tmp);
         Ok(r)
     }
 
-    fn compile_assign<'f, 'a>(
-        &'c self,
+    fn compile_assign<'a>(
+        &self,
         block: &'a ir::Block<'c>,
-        ctx: &'f mut Ctx<'c, 'a>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         name: &str,
         rhs: &ast::Expr,
     ) -> Result<ir::OperationRef<'c, 'a>> {
-        let rhs_result = self.compile_expr(block, ctx, rhs)?;
-        let Some(lvar) = ctx.lvars.get(name) else {
+        let rhs_result = self.compile_expr(block, lvars, rhs)?;
+        let Some(lvar) = lvars.get(name) else {
             return Err(anyhow!("unknown lvar {name}"));
         };
         let op = dialect::memref::store(val(&rhs_result), *lvar, &[], self.unknown_location());
         Ok(block.append_operation(op))
     }
 
-    fn compile_varref<'a>(
-        &'c self,
+    fn compile_return<'a>(
+        &self,
         block: &'a ir::Block<'c>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
+        expr: &ast::Expr,
+    ) -> Result<ir::OperationRef<'c, 'a>> {
+        let v = self.compile_expr(block, lvars, expr)?;
+        let op = dialect::func::r#return(&[val(&v)], self.unknown_location());
+        Ok(block.append_operation(op))
+    }
+
+    fn compile_varref<'a>(
+        &self,
+        block: &'a ir::Block<'c>,
+        _lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         name: &str,
     ) -> Result<ir::OperationRef<'c, 'a>> {
         let op = if let Some(fun_ty) = self.sigs.get(name) {
@@ -372,29 +363,61 @@ impl<'c> Compiler<'c> {
         Ok(block.append_operation(op))
     }
 
-    fn compile_number(&'c self, block: &'c ir::Block<'c>, n: i64) -> ir::OperationRef<'c, 'c> {
-        block.append_operation(self.const_int(n))
+    fn compile_number<'a>(
+        &self,
+        block: &'a ir::Block<'c>,
+        n: i64,
+    ) -> Result<ir::OperationRef<'c, 'a>> {
+        Ok(block.append_operation(self.const_int(n)))
     }
 
-    ///// Returns a newly created region that contains `exprs`.
-    //fn compile_exprs<'a>(
-    //    &'c self,
-    //    ctx: &mut Ctx<'c, 'a>,
-    //    exprs: &[ast::Expr],
-    //    terminate: bool,
-    //) -> Result<ir::Block<'c>> {
-    //    let block = ir::Block::new(&[]);
-    //    for expr in exprs {
-    //        self.compile_expr(&block, ctx, expr)?;
-    //    }
-    //    if terminate {
-    //        let op = dialect::scf::r#yield(&[], self.unknown_location());
-    //        block.append_operation(op);
-    //    }
-    //    Ok(block)
-    //}
+    /// Returns a newly created region that contains `exprs`.
+    fn compile_exprs(
+        &self,
+        lvars: &mut TrainMap<String, ir::Value<'c, '_>>,
+        exprs: &[ast::Expr],
+        terminate: bool,
+    ) -> Result<ir::Block<'c>> {
+        let block = ir::Block::new(&[]);
+        let mut lvars = lvars.fork();
+        for expr in exprs {
+            self.compile_expr(&block, &mut lvars, expr)?;
+        }
+        if terminate {
+            let op = dialect::scf::r#yield(&[], self.unknown_location());
+            block.append_operation(op);
+        }
+        Ok(block)
+        //        let region = ir::Region::new();
+        //        region.append_block(block);
+        //        Ok(region)
+    }
 
-    fn const_int(&'c self, n: i64) -> ir::Operation<'c> {
+    //            ast::Expr::Para(exprs) => {
+    //                let block = ir::Block::new(&[]);
+    //                for expr in exprs {
+    //                    self.compile_expr(&block, lvars, expr)?;
+    //                }
+    //                let zero = self.compile_number(&block, 0);
+    //                block.append_operation(
+    //                    r#async::YieldOp::builder(&self.context, self.unknown_location())
+    //                        .operands(&[val(&zero)])
+    //                        .build()
+    //                        .into(),
+    //                );
+    //                let region = ir::Region::new();
+    //                region.append_block(block);
+    //                r#async::ExecuteOp::builder(&self.context, self.unknown_location())
+    //                    .token(Type::parse(&self.context, "!async.token").unwrap())
+    //                    .body_results(&[Type::parse(&self.context, "!async.value<i64>").unwrap()])
+    //                    .dependencies(&[])
+    //                    .body_operands(&[])
+    //                    .body_region(region)
+    //                    .build()
+    //                    .into()
+    //            }
+
+    fn const_int(&self, n: i64) -> ir::Operation<'c> {
         dialect::arith::constant(
             &self.context,
             IntegerAttribute::new(n, IntegerType::new(&self.context, 64).into()).into(),
@@ -402,17 +425,17 @@ impl<'c> Compiler<'c> {
         )
     }
 
-    fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::r#type::FunctionType> {
+    fn function_type(&self, fun_ty: &ast::FunTy) -> Result<ir::r#type::FunctionType<'c>> {
         let param_tys = self.mlir_types(&fun_ty.param_tys)?;
         let ret_ty = self.mlir_type(&fun_ty.ret_ty)?;
         Ok(FunctionType::new(&self.context, &param_tys, &[ret_ty]).into())
     }
 
-    fn mlir_types(&self, tys: &[ast::Ty]) -> Result<Vec<ir::Type>> {
+    fn mlir_types(&self, tys: &[ast::Ty]) -> Result<Vec<ir::Type<'c>>> {
         tys.iter().map(|x| self.mlir_type(x)).collect()
     }
 
-    fn mlir_type(&self, ty: &ast::Ty) -> Result<ir::Type> {
+    fn mlir_type(&self, ty: &ast::Ty) -> Result<ir::Type<'c>> {
         let t = match ty {
             ast::Ty::Raw(s) => match &s[..] {
                 "none" => Type::none(&self.context).into(),
@@ -424,19 +447,19 @@ impl<'c> Compiler<'c> {
         Ok(t)
     }
 
-    fn i64_type(&self) -> ir::r#type::IntegerType {
+    fn i64_type(&self) -> ir::r#type::IntegerType<'c> {
         ir::r#type::IntegerType::new(&self.context, 64)
     }
 
-    fn identifier(&self, s: &str) -> ir::Identifier {
+    fn identifier(&self, s: &str) -> ir::Identifier<'c> {
         ir::Identifier::new(&self.context, s)
     }
 
-    fn str_attr(&self, s: &str) -> StringAttribute {
+    fn str_attr(&self, s: &str) -> StringAttribute<'c> {
         StringAttribute::new(&self.context, s)
     }
 
-    fn loc(&self, span: &ast::Span) -> ir::Location {
+    fn loc(&self, span: &ast::Span) -> ir::Location<'c> {
         //        let mut line = 1;
         //        let mut col = 1;
         //        for i in 0..span.start {
@@ -458,7 +481,7 @@ impl<'c> Compiler<'c> {
         )
     }
 
-    fn unknown_location(&self) -> ir::Location {
+    fn unknown_location(&self) -> ir::Location<'c> {
         ir::Location::unknown(&self.context)
     }
 }
