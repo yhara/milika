@@ -318,7 +318,7 @@ impl<'c> Compiler<'c> {
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         let op = dialect::memref::alloca(
             &self.context,
-            MemRefType::new(self.i64_type().into(), &[], None, None),
+            MemRefType::new(self.int_type().into(), &[], None, None),
             &[],
             &[],
             None,
@@ -376,7 +376,8 @@ impl<'c> Compiler<'c> {
             );
             Ok(Some(val(block.append_operation(op))))
         } else if let Some(v) = lvars.get(name) {
-            Ok(Some(v.clone()))
+            let op = dialect::memref::load(v.clone(), &[], self.unknown_location());
+            Ok(Some(val(block.append_operation(op))))
         } else {
             Err(anyhow!("unknown variable `{name}'"))
         }
@@ -467,12 +468,13 @@ impl<'c> Compiler<'c> {
     }
 
     fn int_type(&self) -> ir::Type<'c> {
-        ir::Type::index(&self.context)
+        //ir::Type::index(&self.context)
+        ir::r#type::IntegerType::new(&self.context, 64).into()
     }
 
-    fn i64_type(&self) -> ir::r#type::IntegerType<'c> {
-        ir::r#type::IntegerType::new(&self.context, 64)
-    }
+    //fn i64_type(&self) -> ir::r#type::IntegerType<'c> {
+    //    ir::r#type::IntegerType::new(&self.context, 64)
+    //}
 
     fn identifier(&self, s: &str) -> ir::Identifier<'c> {
         ir::Identifier::new(&self.context, s)

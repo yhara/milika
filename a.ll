@@ -12,17 +12,22 @@ define i64 @main() {
   %2 = insertvalue { ptr, ptr, i64 } undef, ptr %1, 0
   %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1
   %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2
-  br i1 false, label %5, label %7
+  %5 = extractvalue { ptr, ptr, i64 } %4, 1
+  store i64 90, ptr %5, align 4
+  %6 = extractvalue { ptr, ptr, i64 } %4, 1
+  %7 = load i64, ptr %6, align 4
+  %8 = icmp eq i64 %7, 91
+  br i1 %8, label %9, label %11
 
-5:                                                ; preds = %0
-  %6 = call i64 @putchar(i64 86)
-  br label %9
+9:                                                ; preds = %0
+  %10 = call i64 @putchar(i64 86)
+  br label %13
 
-7:                                                ; preds = %0
-  %8 = call i64 @putchar(i64 74)
-  br label %9
+11:                                               ; preds = %0
+  %12 = call i64 @putchar(i64 74)
+  br label %13
 
-9:                                                ; preds = %5, %7
+13:                                               ; preds = %9, %11
   ret i64 0
 }
 

@@ -42,10 +42,12 @@ task a: :default
 
 task :hand do
   sh "mlir-opt#{SUFFIX} \
+    --convert-index-to-llvm \
     --convert-arith-to-llvm \
     --convert-scf-to-cf \
     --convert-func-to-llvm \
-    < a.mlir > a2.mlir"
+    --finalize-memref-to-llvm \
+    < a.mlir > a2.mlir" 
     #--irdl-file=a.irdl \
     #--reconcile-unrealized-casts \
   sh "mlir-translate --mlir-to-llvmir a2.mlir > a.ll"
