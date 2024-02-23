@@ -13,21 +13,31 @@ define i64 @main() {
   %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1
   %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2
   %5 = extractvalue { ptr, ptr, i64 } %4, 1
-  store i64 90, ptr %5, align 4
+  store i64 0, ptr %5, align 4
   %6 = extractvalue { ptr, ptr, i64 } %4, 1
   %7 = load i64, ptr %6, align 4
-  %8 = icmp eq i64 %7, 91
-  br i1 %8, label %9, label %11
+  %8 = icmp ult i64 %7, 3
+  br label %9
 
-9:                                                ; preds = %0
-  %10 = call i64 @putchar(i64 86)
-  br label %13
+9:                                                ; preds = %13, %0
+  %10 = extractvalue { ptr, ptr, i64 } %4, 1
+  %11 = load i64, ptr %10, align 4
+  %12 = icmp ult i64 %11, 3
+  br i1 %12, label %13, label %22
 
-11:                                               ; preds = %0
-  %12 = call i64 @putchar(i64 74)
-  br label %13
+13:                                               ; preds = %9
+  %14 = extractvalue { ptr, ptr, i64 } %4, 1
+  %15 = load i64, ptr %14, align 4
+  %16 = add i64 %15, 80
+  %17 = call i64 @putchar(i64 %16)
+  %18 = extractvalue { ptr, ptr, i64 } %4, 1
+  %19 = load i64, ptr %18, align 4
+  %20 = add i64 %19, 1
+  %21 = extractvalue { ptr, ptr, i64 } %4, 1
+  store i64 %20, ptr %21, align 4
+  br label %9
 
-13:                                               ; preds = %9, %11
+22:                                               ; preds = %9
   ret i64 0
 }
 

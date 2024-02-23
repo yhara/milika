@@ -8,31 +8,37 @@ module attributes {llvm.data_layout = ""} {
     %4 = llvm.insertvalue %1, %3[1] : !llvm.struct<(ptr, ptr, i64)> 
     %5 = llvm.mlir.constant(0 : index) : i64
     %6 = llvm.insertvalue %5, %4[2] : !llvm.struct<(ptr, ptr, i64)> 
-    %7 = llvm.mlir.constant(90 : i64) : i64
+    %7 = llvm.mlir.constant(0 : i64) : i64
     %8 = llvm.extractvalue %6[1] : !llvm.struct<(ptr, ptr, i64)> 
     llvm.store %7, %8 : i64, !llvm.ptr
     %9 = llvm.extractvalue %6[1] : !llvm.struct<(ptr, ptr, i64)> 
     %10 = llvm.load %9 : !llvm.ptr -> i64
-    %11 = llvm.mlir.constant(91 : i64) : i64
-    %12 = llvm.icmp "eq" %10, %11 : i64
-    llvm.cond_br %12, ^bb1, ^bb2
-  ^bb1:  // pred: ^bb0
-    %13 = llvm.mlir.addressof @putchar : !llvm.ptr
-    %14 = llvm.mlir.constant(80 : i64) : i64
-    %15 = llvm.mlir.constant(6 : i64) : i64
-    %16 = llvm.mlir.constant(86 : i64) : i64
-    %17 = llvm.call %13(%16) : !llvm.ptr, (i64) -> i64
-    llvm.br ^bb3
-  ^bb2:  // pred: ^bb0
-    %18 = llvm.mlir.addressof @putchar : !llvm.ptr
-    %19 = llvm.mlir.constant(80 : i64) : i64
-    %20 = llvm.mlir.constant(6 : i64) : i64
-    %21 = llvm.mlir.constant(74 : i64) : i64
-    %22 = llvm.call %18(%21) : !llvm.ptr, (i64) -> i64
-    llvm.br ^bb3
-  ^bb3:  // 2 preds: ^bb1, ^bb2
-    %23 = llvm.mlir.constant(0 : i64) : i64
-    llvm.return %23 : i64
+    %11 = llvm.mlir.constant(3 : i64) : i64
+    %12 = llvm.icmp "ult" %10, %11 : i64
+    llvm.br ^bb1
+  ^bb1:  // 2 preds: ^bb0, ^bb2
+    %13 = llvm.extractvalue %6[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %14 = llvm.load %13 : !llvm.ptr -> i64
+    %15 = llvm.mlir.constant(3 : i64) : i64
+    %16 = llvm.icmp "ult" %14, %15 : i64
+    llvm.cond_br %16, ^bb2, ^bb3
+  ^bb2:  // pred: ^bb1
+    %17 = llvm.mlir.addressof @putchar : !llvm.ptr
+    %18 = llvm.mlir.constant(80 : i64) : i64
+    %19 = llvm.extractvalue %6[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %20 = llvm.load %19 : !llvm.ptr -> i64
+    %21 = llvm.add %20, %18  : i64
+    %22 = llvm.call %17(%21) : !llvm.ptr, (i64) -> i64
+    %23 = llvm.extractvalue %6[1] : !llvm.struct<(ptr, ptr, i64)> 
+    %24 = llvm.load %23 : !llvm.ptr -> i64
+    %25 = llvm.mlir.constant(1 : i64) : i64
+    %26 = llvm.add %24, %25  : i64
+    %27 = llvm.extractvalue %6[1] : !llvm.struct<(ptr, ptr, i64)> 
+    llvm.store %26, %27 : i64, !llvm.ptr
+    llvm.br ^bb1
+  ^bb3:  // pred: ^bb1
+    %28 = llvm.mlir.constant(0 : i64) : i64
+    llvm.return %28 : i64
   }
   llvm.func @mlirAsyncRuntimeAddRef(!llvm.ptr, i64) attributes {sym_visibility = "private"}
   llvm.func @mlirAsyncRuntimeDropRef(!llvm.ptr, i64) attributes {sym_visibility = "private"}

@@ -96,6 +96,7 @@ pub enum Expr {
     OpCall(String, Box<Expr>, Box<Expr>),
     FunCall(Box<Expr>, Vec<Expr>),
     If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>),
+    While(Box<Expr>, Vec<Expr>),
     Cast(Box<Expr>, Ty),
     Alloc(String),
     Assign(String, Box<Expr>),

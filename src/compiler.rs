@@ -6,7 +6,7 @@ use melior::{
     ir::{
         self,
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
-        r#type::{FunctionType, IntegerType, MemRefType, Type},
+        r#type::{FunctionType, MemRefType, Type},
     },
     //pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
@@ -184,6 +184,7 @@ impl<'c> Compiler<'c> {
                 self.compile_funcall(block, lvars, fexpr, arg_exprs)
             }
             ast::Expr::If(cond, then, els) => self.compile_if(block, lvars, cond, then, els),
+            ast::Expr::While(cond, exprs) => self.compile_while(block, lvars, cond, exprs),
             ast::Expr::Alloc(name) => self.compile_alloc(block, lvars, name),
             ast::Expr::Assign(name, rhs) => self.compile_assign(block, lvars, name, rhs),
             ast::Expr::Return(val_expr) => self.compile_return(block, lvars, val_expr),
@@ -307,6 +308,39 @@ impl<'c> Compiler<'c> {
             self.unknown_location(),
         );
         block.append_operation(op);
+        Ok(None)
+    }
+
+    fn compile_while<'a>(
+        &self,
+        block: &'a ir::Block<'c>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
+        cond_expr: &ast::Expr,
+        exprs: &[ast::Expr],
+    ) -> Result<Option<ir::Value<'c, 'a>>> {
+        let cond_result = self.compile_value_expr(block, lvars, cond_expr)?;
+        let before_region = {
+            let region = ir::Region::new();
+            let block = ir::Block::new(&[]);
+            let mut lvars = lvars.fork();
+            let v = self.compile_value_expr(&block, &mut lvars, cond_expr)?;
+            block.append_operation(dialect::scf::condition(v, &[], self.unknown_location()));
+            region.append_block(block);
+            region
+        };
+        let after_region = {
+            let region = ir::Region::new();
+            let block = self.compile_exprs(lvars, exprs, true)?;
+            region.append_block(block);
+            region
+        };
+        block.append_operation(dialect::scf::r#while(
+            &[],
+            &[],
+            before_region,
+            after_region,
+            self.unknown_location(),
+        ));
         Ok(None)
     }
 

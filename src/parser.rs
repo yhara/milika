@@ -135,7 +135,10 @@ fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
             parse_assign,
             alt((
                 parse_alloc,
-                alt((parse_return, alt((parse_if, parse_expr)))),
+                alt((
+                    parse_return,
+                    alt((parse_if, alt((parse_while, parse_expr)))),
+                )),
             )),
         )),
         terminated(multispace0, tag(";")),
@@ -178,6 +181,21 @@ fn parse_if<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, _) = multispace0(s)?;
     let (s, els) = opt(parse_else)(s)?;
     Ok((s, ast::Expr::If(Box::new(cond), then, els)))
+}
+
+fn parse_while<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+    let (s, _) = tag("while")(s)?;
+    let (s, cond) = delimited(
+        multispace0,
+        delimited(
+            tag("("),
+            delimited(multispace0, parse_expr, multispace0),
+            tag(")"),
+        ),
+        multispace0,
+    )(s)?;
+    let (s, exprs) = parse_block(s)?;
+    Ok((s, ast::Expr::While(Box::new(cond), exprs)))
 }
 
 fn parse_else<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
