@@ -28,7 +28,7 @@ type E<'a> = nom::error::VerboseError<Span<'a>>;
 
 pub fn parse(src: &str) -> Result<ast::Program> {
     let input = Span::new(src);
-    match parse_decls(input) {
+    match parse_program(input) {
         Ok((_, prog)) => Ok(prog),
         Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
             // https://github.com/fflorent/nom_locate/issues/36#issuecomment-1013469728
@@ -42,6 +42,12 @@ pub fn parse(src: &str) -> Result<ast::Program> {
         }
         _ => unreachable!(),
     }
+}
+
+fn parse_program<'a>(s: Span<'a>) -> IResult<Span, ast::Program<'a>, E> {
+    let (s, pos) = position(s)?;
+    let (s, decls) = parse_decls(s)?;
+    Ok((s, (decls, pos)))
 }
 
 fn parse_decls(s: Span) -> IResult<Span, Vec<ast::Declaration>, E> {
@@ -120,7 +126,7 @@ fn parse_function<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>, E>
     Ok((s, ast::Declaration::Function((e, pos))))
 }
 
-fn parse_block<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+fn parse_block<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::SpannedExpr<'a>>, E> {
     delimited(
         tag("{"),
         many0(delimited(parse_comments, parse_stmt, parse_comments)),
@@ -129,7 +135,7 @@ fn parse_block<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
 }
 
 /// An expr terminated with ';'
-fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
     terminated(
         alt((
             parse_assign,
@@ -145,28 +151,31 @@ fn parse_stmt<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     )(s)
 }
 
-fn parse_assign<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, (name, _pos)) = parse_ident(s)?;
+fn parse_assign<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, (name, pos)) = parse_ident(s)?;
     let (s, _) = delimited(multispace0, tag("="), multispace0)(s)?;
     let (s, rhs) = preceded(multispace0, parse_expr)(s)?;
-    Ok((s, ast::Expr::Assign(name.to_string(), Box::new(rhs))))
+    Ok((s, (ast::Expr::Assign(name.to_string(), Box::new(rhs)), pos)))
 }
 
-fn parse_alloc<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_alloc<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, pos) = position(s)?;
     let (s, _) = tag("alloc")(s)?;
     let (s, _) = multispace1(s)?;
     let (s, (name, _pos)) = parse_ident(s)?;
-    Ok((s, ast::Expr::Alloc(name.to_string())))
+    Ok((s, (ast::Expr::Alloc(name.to_string()), pos)))
 }
 
-fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_return<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, pos) = position(s)?;
     let (s, _) = tag("return")(s)?;
     let (s, _) = multispace1(s)?;
     let (s, expr) = parse_expr(s)?;
-    Ok((s, ast::Expr::Return(Box::new(expr))))
+    Ok((s, (ast::Expr::Return(Box::new(expr)), pos)))
 }
 
-fn parse_if<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_if<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, pos) = position(s)?;
     let (s, _) = tag("if")(s)?;
     let (s, cond) = delimited(
         multispace0,
@@ -180,10 +189,11 @@ fn parse_if<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     let (s, then) = parse_block(s)?;
     let (s, _) = multispace0(s)?;
     let (s, els) = opt(parse_else)(s)?;
-    Ok((s, ast::Expr::If(Box::new(cond), then, els)))
+    Ok((s, (ast::Expr::If(Box::new(cond), then, els), pos)))
 }
 
-fn parse_while<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_while<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, pos) = position(s)?;
     let (s, _) = tag("while")(s)?;
     let (s, cond) = delimited(
         multispace0,
@@ -195,16 +205,16 @@ fn parse_while<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
         multispace0,
     )(s)?;
     let (s, exprs) = parse_block(s)?;
-    Ok((s, ast::Expr::While(Box::new(cond), exprs)))
+    Ok((s, (ast::Expr::While(Box::new(cond), exprs), pos)))
 }
 
-fn parse_else<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+fn parse_else<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::SpannedExpr<'a>>, E> {
     let (s, _) = tag("else")(s)?;
     let (s, _) = multispace0(s)?;
     parse_block(s)
 }
 
-fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
     let (s, left) = parse_additive(s)?;
     let (s, _) = multispace0(s)?;
     let (s, chain) = many0(separated_pair(
@@ -221,7 +231,7 @@ fn parse_expr<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     Ok((s, build_op_calls(left, chain)))
 }
 
-fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
     let (s, left) = parse_multiplicative(s)?;
     let (s, _) = multispace0(s)?;
     let (s, chain) = many0(separated_pair(
@@ -232,7 +242,7 @@ fn parse_additive<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     Ok((s, build_op_calls(left, chain)))
 }
 
-fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
     let (s, left) = parse_atomic(s)?;
     let (s, _) = multispace0(s)?;
     let (s, chain) = many0(separated_pair(
@@ -243,33 +253,42 @@ fn parse_multiplicative<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
     Ok((s, build_op_calls(left, chain)))
 }
 
-fn build_op_calls(expr: ast::Expr, chain: Vec<(Span, ast::Expr)>) -> ast::Expr {
+fn build_op_calls<'a>(
+    expr: ast::SpannedExpr<'a>,
+    chain: Vec<(Span, ast::SpannedExpr<'a>)>,
+) -> ast::SpannedExpr<'a> {
     chain.into_iter().fold(expr, |acc, (op, right)| {
-        ast::Expr::OpCall(op.to_string(), Box::new(acc), Box::new(right))
+        let pos = acc.1.clone();
+        (
+            ast::Expr::OpCall(op.to_string(), Box::new(acc), Box::new(right)),
+            pos,
+        )
     })
 }
 
-fn parse_atomic<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_atomic<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
     alt((
         parse_para,
         alt((parse_funcall, alt((parse_number, parse_varref)))),
     ))(s)
 }
 
-fn parse_para<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_para<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, pos) = position(s)?;
     let (s, _) = tag("para")(s)?;
     let (s, _) = multispace0(s)?;
     let (s, exprs) = parse_block(s)?;
-    Ok((s, ast::Expr::Para(exprs)))
+    Ok((s, (ast::Expr::Para(exprs), pos)))
 }
 
-fn parse_funcall<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, f) = parse_varref(s)?;
+fn parse_funcall<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, (f, pos)) = parse_varref(s)?;
     let (s, args) = parse_arg_list(s)?;
-    Ok((s, ast::Expr::FunCall(Box::new(f), args)))
+    let fexpr = (f, pos.clone());
+    Ok((s, (ast::Expr::FunCall(Box::new(fexpr), args), pos)))
 }
 
-fn parse_arg_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+fn parse_arg_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::SpannedExpr<'a>>, E> {
     delimited(
         tag("("),
         delimited(multispace0, parse_args, multispace0),
@@ -277,19 +296,20 @@ fn parse_arg_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
     )(s)
 }
 
-fn parse_args<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Expr>, E> {
+fn parse_args<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::SpannedExpr<'a>>, E> {
     separated_list0(delimited(multispace0, tag(","), multispace0), parse_expr)(s)
 }
 
-fn parse_number<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
+fn parse_number<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
     // TODO: Just parse integer
+    let (s, pos) = position(s)?;
     let (s, n) = number::complete::double(s)?;
-    Ok((s, ast::Expr::Number(n.floor() as i64)))
+    Ok((s, (ast::Expr::Number(n.floor() as i64), pos)))
 }
 
-fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Expr, E> {
-    let (s, (name, _pos)) = parse_ident(s)?;
-    Ok((s, ast::Expr::VarRef(name)))
+fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
+    let (s, (name, pos)) = parse_ident(s)?;
+    Ok((s, (ast::Expr::VarRef(name), pos)))
 }
 
 fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>, E> {

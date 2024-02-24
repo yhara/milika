@@ -45,7 +45,7 @@ fn gather_sig(
     sigs: &HashMap<String, FunTy>,
 ) -> Result<Either<FuncName, FunTy>> {
     let mut is_async = false;
-    for stmt in &func.body_stmts {
+    for (stmt, _) in &func.body_stmts {
         match check_async(&func.name, &stmt, sigs)? {
             Either::Left(x) => return Ok(Either::Left(x)),
             Either::Right(b) => is_async = is_async || b,
@@ -61,7 +61,7 @@ fn check_async(
 ) -> Result<Either<FuncName, bool>> {
     match expr {
         ast::Expr::FunCall(fexpr, arg_exprs) => {
-            let ast::Expr::VarRef(ref fname) = **fexpr else {
+            let (ast::Expr::VarRef(ref fname), _) = **fexpr else {
                 return Err(anyhow!("not a function: {:?}", fexpr));
             };
             if let Some(fun_ty) = sigs.get(fname) {
@@ -69,7 +69,7 @@ fn check_async(
                     Ok(Either::Right(true))
                 } else {
                     let mut is_async = false;
-                    for e in arg_exprs {
+                    for (e, _) in arg_exprs {
                         match check_async(func_name, e, sigs)? {
                             Either::Left(x) => return Ok(Either::Left(x)),
                             Either::Right(b) => is_async = is_async || b,

@@ -1,4 +1,5 @@
 extern putchar(int n) -> int;
+#extern_async sleep_sec(int n) -> int;
 
 fun main() -> int {
   alloc a;
