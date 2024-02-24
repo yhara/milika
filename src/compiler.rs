@@ -2,7 +2,11 @@ use crate::ast;
 use crate::asyncness_check::gather_sigs;
 use anyhow::{anyhow, Result};
 use melior::{
-    dialect::{self, ods::r#async, DialectRegistry},
+    dialect::{
+        self,
+        //ods::r#async,
+        DialectRegistry,
+    },
     ir::{
         self,
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
@@ -456,9 +460,6 @@ impl<'c> Compiler<'c> {
             block.append_operation(op);
         }
         Ok(block)
-        //        let region = ir::Region::new();
-        //        region.append_block(block);
-        //        Ok(region)
     }
 
     //            ast::Expr::Para(exprs) => {
@@ -510,19 +511,14 @@ impl<'c> Compiler<'c> {
                 "int" => self.int_type().into(),
                 _ => return Err(anyhow!("unknown type `{}'", s)),
             },
-            ast::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
+            //ast::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
         Ok(t)
     }
 
     fn int_type(&self) -> ir::Type<'c> {
-        //ir::Type::index(&self.context)
         ir::r#type::IntegerType::new(&self.context, 64).into()
     }
-
-    //fn i64_type(&self) -> ir::r#type::IntegerType<'c> {
-    //    ir::r#type::IntegerType::new(&self.context, 64)
-    //}
 
     fn identifier(&self, s: &str) -> ir::Identifier<'c> {
         ir::Identifier::new(&self.context, s)

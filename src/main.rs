@@ -1,6 +1,8 @@
 mod ast;
+mod ast2hir;
 mod asyncness_check;
 mod compiler;
+mod hir;
 mod parser;
 use anyhow::{bail, Context, Result};
 

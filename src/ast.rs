@@ -61,25 +61,10 @@ pub struct Param {
     pub name: String,
 }
 
-impl Param {
-    //pub fn new(ty: Ty, name: &str) -> Param {
-    //    Param {
-    //        ty,
-    //        name: name.to_string(),
-    //    }
-    //}
-}
-
 #[derive(PartialEq, Debug, Clone)]
 pub enum Ty {
     Raw(String),
-    Fun(FunTy),
-}
-
-impl Ty {
-    //pub fn raw(name: &str) -> Ty {
-    //    Ty::Raw(name.to_string())
-    //}
+    //Fun(FunTy),
 }
 
 #[derive(PartialEq, Debug, Clone)]
