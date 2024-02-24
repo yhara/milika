@@ -4,11 +4,11 @@ use anyhow::{anyhow, Result};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till},
-    character::complete::{alphanumeric1, multispace0, multispace1},
-    combinator::{eof, opt},
-    multi::{many0, separated_list0},
+    character::complete::{alpha1, alphanumeric1, multispace0, multispace1},
+    combinator::{eof, opt, recognize},
+    multi::{many0, many0_count, separated_list0},
     number,
-    sequence::{delimited, preceded, separated_pair, terminated},
+    sequence::{delimited, pair, preceded, separated_pair, terminated},
     IResult,
 };
 use nom_locate::{self, position};
@@ -99,7 +99,7 @@ fn parse_param_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Param>, E> {
 }
 
 fn parse_params<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Param>, E> {
-    many0(delimited(multispace0, parse_param, multispace0))(s)
+    separated_list0(delimited(multispace0, tag(", "), multispace0), parse_param)(s)
 }
 
 fn parse_param<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Param, E> {
@@ -314,7 +314,10 @@ fn parse_varref<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::SpannedExpr<'a>, E> {
 
 fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>, E> {
     let (s, pos) = position(s)?;
-    let (s, name) = alphanumeric1(s)?;
+    let (s, name) = recognize(pair(
+        alt((alpha1, tag("_"))),
+        many0_count(alt((alphanumeric1, tag("_")))),
+    ))(s)?;
     Ok((s, (name.to_string(), pos)))
 }
 
