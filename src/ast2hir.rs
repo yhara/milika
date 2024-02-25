@@ -119,13 +119,7 @@ impl Ast2Hir {
 
     fn compile_expr(&mut self, orig_func: &ast::Function, e: ast::Expr) -> Result<hir::Expr> {
         let new_e = match e {
-            ast::Expr::Alloc(name) => hir::Expr::Alloc(name),
             ast::Expr::Number(n) => hir::Expr::Number(n),
-            ast::Expr::OpCall(op, lhs, rhs) => {
-                let l = self.compile_expr(orig_func, lhs.0)?;
-                let r = self.compile_expr(orig_func, rhs.0)?;
-                hir::Expr::OpCall(op, Box::new(l), Box::new(r))
-            }
             ast::Expr::VarRef(ref name) => {
                 if self.sigs.contains_key(name) {
                     hir::Expr::VarRef(name.to_string())
@@ -143,6 +137,11 @@ impl Ast2Hir {
                         vec![hir::Expr::var_ref("$env"), hir::Expr::Number(idx as i64)],
                     )
                 }
+            }
+            ast::Expr::OpCall(op, lhs, rhs) => {
+                let l = self.compile_expr(orig_func, lhs.0)?;
+                let r = self.compile_expr(orig_func, rhs.0)?;
+                hir::Expr::OpCall(op, Box::new(l), Box::new(r))
             }
             ast::Expr::FunCall(fexpr, arg_exprs) => {
                 let mut new_args = arg_exprs
@@ -179,7 +178,12 @@ impl Ast2Hir {
             ast::Expr::Assign(name, rhs) => {
                 hir::Expr::Assign(name, Box::new(self.compile_expr(orig_func, rhs.0)?))
             }
-            _ => todo!(),
+            //ast::Expr::While(cond_expr, body_exprs) => todo!(),
+            ast::Expr::Alloc(name) => hir::Expr::Alloc(name),
+            ast::Expr::Return(expr) => {
+                hir::Expr::Return(Box::new(self.compile_expr(orig_func, expr.0)?))
+            }
+            _ => todo!("{:?}", e),
         };
         Ok(new_e)
     }

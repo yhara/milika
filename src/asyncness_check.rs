@@ -1,11 +1,12 @@
-use crate::ast::{self, FunTy};
+use crate::ast::{self};
+use crate::hir;
 use anyhow::{anyhow, Result};
 use either::Either;
 use std::collections::HashMap;
 
 type FuncName = String;
 
-pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, ast::FunTy>> {
+pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::FunTy>> {
     let mut sigs = HashMap::new();
     let mut funcs = HashMap::new();
     let mut queue = vec![];
@@ -42,8 +43,8 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, ast::Fu
 
 fn gather_sig(
     func: &ast::Function,
-    sigs: &HashMap<String, FunTy>,
-) -> Result<Either<FuncName, FunTy>> {
+    sigs: &HashMap<String, hir::FunTy>,
+) -> Result<Either<FuncName, hir::FunTy>> {
     let mut is_async = false;
     for (stmt, _) in &func.body_stmts {
         match check_async(&func.name, &stmt, sigs)? {
@@ -57,7 +58,7 @@ fn gather_sig(
 fn check_async(
     func_name: &str,
     expr: &ast::Expr,
-    sigs: &HashMap<String, FunTy>,
+    sigs: &HashMap<String, hir::FunTy>,
 ) -> Result<Either<FuncName, bool>> {
     match expr {
         ast::Expr::FunCall(fexpr, arg_exprs) => {

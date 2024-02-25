@@ -1,5 +1,6 @@
 mod ast;
-mod ast2hir;
+mod typing;
+//mod ast2hir;
 mod asyncness_check;
 mod compiler;
 mod hir;
@@ -13,6 +14,8 @@ fn main() -> Result<()> {
     };
     let src: String = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
     let ast = parser::parse(&src)?;
-    compiler::run(path, &src, ast)?;
+    let prog = ast2hir::run(ast)?;
+    dbg!(&prog);
+    //compiler::run(path, &src, ast)?;
     Ok(())
 }

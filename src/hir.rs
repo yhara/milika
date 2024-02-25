@@ -30,7 +30,7 @@ pub struct Function {
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
-    pub body_stmts: Vec<Expr>,
+    pub body_stmts: Vec<Typed<Expr>>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,13 +57,15 @@ impl Param {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
+    Void,
     Opaque, // Its type is unknown to Milika
     ChiikaEnv,
     ChiikaCont,
     RustFuture,
-    Raw(String),
+    Int,
+    Bool,
     Fun(FunTy),
 }
 
@@ -74,6 +76,8 @@ impl From<ast::Ty> for Ty {
                 "ENV" => Ty::ChiikaEnv,
                 "CONT" => Ty::ChiikaCont,
                 "FUTURE" => Ty::RustFuture,
+                "int" => Ty::Int,
+                "bool" => Ty::Bool,
                 _ => Ty::Raw(s),
             },
             _ => todo!(),
@@ -88,19 +92,21 @@ pub struct FunTy {
     pub ret_ty: Box<Ty>,
 }
 
+type Typed<T> = (T, Ty);
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Number(i64),
     VarRef(String),
-    OpCall(String, Box<Expr>, Box<Expr>),
-    FunCall(Box<Expr>, Vec<Expr>),
-    If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>),
-    While(Box<Expr>, Vec<Expr>),
-    Cast(Box<Expr>, Ty),
+    OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
+    FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
+    If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Option<Vec<Typed<Expr>>>),
+    While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
+    Cast(Box<Typed<Expr>>, Ty),
     Alloc(String),
-    Assign(String, Box<Expr>),
-    Return(Box<Expr>),
-    Para(Vec<Expr>),
+    Assign(String, Box<Typed<Expr>>),
+    Return(Box<Typed<Expr>>),
+    Para(Vec<Typed<Expr>>),
 }
 
 impl Expr {
