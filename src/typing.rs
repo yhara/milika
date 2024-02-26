@@ -28,10 +28,11 @@ pub fn run(ast: ast::Program) -> Result<hir::Program> {
 
 impl Typing {
     fn compile_func(&self, f: ast::Function) -> Result<hir::Function> {
+        let mut lvars = HashMap::new();
         let body_stmts = f
             .body_stmts
             .iter()
-            .map(|e| self.compile_expr(&f, &e.0))
+            .map(|e| self.compile_expr(&f, &mut lvars, &e.0))
             .collect::<Result<Vec<_>>>()?;
         Ok(hir::Function {
             name: f.name,
@@ -48,6 +49,7 @@ impl Typing {
     fn compile_expr(
         &self,
         orig_func: &ast::Function,
+        lvars: &mut HashMap<String, hir::Ty>,
         e: &ast::Expr,
     ) -> Result<(hir::Expr, hir::Ty)> {
         let hir_expr = match e {
@@ -60,6 +62,8 @@ impl Typing {
                     fun_ty.clone().into()
                 } else if let Some(p) = orig_func.params.iter().find(|x| &x.name == name) {
                     p.ty.clone().try_into()?
+                } else if let Some(ty) = lvars.get(name) {
+                    ty.clone()
                 } else {
                     return Err(anyhow!("unknown variable `{name}'"));
                 };
@@ -71,15 +75,15 @@ impl Typing {
                     "==" | "!=" | "<" | "<=" | ">" | ">=" => hir::Ty::Bool,
                     _ => return Err(anyhow!("[BUG] unknown operator `{op}'")),
                 };
-                let l = self.compile_expr(orig_func, &lhs.0)?;
-                let r = self.compile_expr(orig_func, &rhs.0)?;
+                let l = self.compile_expr(orig_func, lvars, &lhs.0)?;
+                let r = self.compile_expr(orig_func, lvars, &rhs.0)?;
                 (
                     hir::Expr::OpCall(op.to_string(), Box::new(l), Box::new(r)),
                     ty,
                 )
             }
             ast::Expr::FunCall(fexpr, arg_exprs) => {
-                let f = self.compile_expr(orig_func, &fexpr.0)?;
+                let f = self.compile_expr(orig_func, lvars, &fexpr.0)?;
                 let hir::Ty::Fun(fun_ty) = &f.1 else {
                     return Err(anyhow!("not a function: {:?}", f.1));
                 };
@@ -93,20 +97,20 @@ impl Typing {
                 }
                 let args = arg_exprs
                     .into_iter()
-                    .map(|e| self.compile_expr(orig_func, &e.0))
+                    .map(|e| self.compile_expr(orig_func, lvars, &e.0))
                     .collect::<Result<Vec<_>>>()?;
                 check_funcall_arg_types(&fun_ty.param_tys, &args)?;
                 let ty = (*fun_ty.ret_ty).clone();
                 (hir::Expr::FunCall(Box::new(f), args), ty)
             }
             ast::Expr::If(cond_expr, then_exprs, opt_else_exprs) => {
-                let cond = self.compile_expr(orig_func, &cond_expr.0)?;
+                let cond = self.compile_expr(orig_func, lvars, &cond_expr.0)?;
                 if cond.1 != hir::Ty::Bool {
                     return Err(anyhow!("if condition must be Bool"));
                 }
-                let then = self.compile_exprs(orig_func, then_exprs)?;
+                let then = self.compile_exprs(orig_func, lvars, then_exprs)?;
                 let els = if let Some(es) = opt_else_exprs {
-                    Some(self.compile_exprs(orig_func, es)?)
+                    Some(self.compile_exprs(orig_func, lvars, es)?)
                 } else {
                     None
                 };
@@ -114,25 +118,26 @@ impl Typing {
                 (hir::Expr::If(Box::new(cond), then, els), ty)
             }
             ast::Expr::While(cond_expr, body_exprs) => {
-                let cond = self.compile_expr(orig_func, &cond_expr.0)?;
+                let cond = self.compile_expr(orig_func, lvars, &cond_expr.0)?;
                 if cond.1 != hir::Ty::Bool {
                     return Err(anyhow!("while condition must be Bool"));
                 }
-                let body = self.compile_exprs(orig_func, body_exprs)?;
+                let body = self.compile_exprs(orig_func, lvars, body_exprs)?;
                 let ty = hir::Ty::Void;
                 (hir::Expr::While(Box::new(cond), body), ty)
             }
             ast::Expr::Alloc(name) => {
                 let ty = hir::Ty::Void;
+                lvars.insert(name.to_string(), hir::Ty::Int);
                 (hir::Expr::Alloc(name.to_string()), ty)
             }
             ast::Expr::Assign(name, rhs) => {
-                let r = self.compile_expr(orig_func, &rhs.0)?;
+                let r = self.compile_expr(orig_func, lvars, &rhs.0)?;
                 let ty = hir::Ty::Void;
                 (hir::Expr::Assign(name.to_string(), Box::new(r)), ty)
             }
             ast::Expr::Return(val_expr) => {
-                let v = self.compile_expr(orig_func, &val_expr.0)?;
+                let v = self.compile_expr(orig_func, lvars, &val_expr.0)?;
                 if v.1 != orig_func.ret_ty.clone().try_into()? {
                     return Err(anyhow!("return type mismatch"));
                 }
@@ -147,10 +152,11 @@ impl Typing {
     fn compile_exprs(
         &self,
         orig_func: &ast::Function,
+        lvars: &mut HashMap<String, hir::Ty>,
         es: &[ast::SpannedExpr],
     ) -> Result<Vec<(hir::Expr, hir::Ty)>> {
         es.iter()
-            .map(|e| self.compile_expr(orig_func, &e.0))
+            .map(|e| self.compile_expr(orig_func, lvars, &e.0))
             .collect()
     }
 }
