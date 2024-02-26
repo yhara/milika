@@ -92,6 +92,12 @@ pub struct FunTy {
     pub ret_ty: Box<Ty>,
 }
 
+impl From<FunTy> for Ty {
+    fn from(x: FunTy) -> Self {
+        Ty::Fun(x)
+    }
+}
+
 type Typed<T> = (T, Ty);
 
 #[derive(Debug, Clone)]
