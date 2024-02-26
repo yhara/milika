@@ -36,7 +36,7 @@ impl Typing {
         Ok(hir::Function {
             name: f.name,
             params: f.params.into_iter().map(|x| x.into()).collect::<Vec<_>>(),
-            ret_ty: f.ret_ty.into(),
+            ret_ty: f.ret_ty.try_into()?,
             body_stmts,
         })
     }
@@ -55,7 +55,7 @@ impl Typing {
                 let ty = if let Some(fun_ty) = self.sigs.get(&name) {
                     fun_ty.clone().into()
                 } else if let Some(p) = orig_func.params.iter().find(|x| x.name == name) {
-                    p.ty.clone().into()
+                    p.ty.clone().try_into()?
                 } else {
                     return Err(anyhow!("unknown variable `{name}'"));
                 };
@@ -92,7 +92,11 @@ impl Typing {
                     return Err(anyhow!("if condition must be Bool"));
                 }
                 let then = self.compile_exprs(orig_func, then_exprs)?;
-                let els = opt_else_exprs.map(|x| self.compile_exprs(orig_func, x)?;
+                let els = if let Some(es) = opt_else_exprs {
+                    Some(self.compile_exprs(orig_func, es)?)
+                } else {
+                    None
+                };
                 let ty = hir::Ty::Void;
                 (hir::Expr::If(Box::new(cond), then, els), ty)
             }
@@ -116,7 +120,7 @@ impl Typing {
             }
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(orig_func, val_expr.0)?;
-                if v.1 != orig_func.ty {
+                if v.1 != orig_func.ret_ty.try_into()? {
                     return Err(anyhow!("return type mismatch"));
                 }
                 let ty = hir::Ty::Void;
@@ -141,7 +145,7 @@ impl Typing {
 fn check_funcall_arg_types(param_tys: &[hir::Ty], args: &[(hir::Expr, hir::Ty)]) -> Result<()> {
     for (param_ty, (_, arg_ty)) in param_tys.iter().zip(args.iter()) {
         if param_ty != arg_ty {
-            Err(anyhow!(
+            return Err(anyhow!(
                 "funcall arg type mismatch: expected {:?} but got {:?}",
                 param_ty,
                 arg_ty

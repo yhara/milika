@@ -1,5 +1,6 @@
 use crate::ast;
 use crate::asyncness_check::gather_sigs;
+use crate::hir;
 use anyhow::{anyhow, Result};
 use melior::{
     dialect::{
@@ -38,7 +39,7 @@ struct Compiler<'c> {
     filename: &'c str,
     src: &'c str,
     context: &'c melior::Context,
-    sigs: HashMap<String, ast::FunTy>,
+    sigs: HashMap<String, hir::FunTy>,
 }
 
 pub fn run(filename: &str, src: &str, prog: ast::Program) -> Result<()> {

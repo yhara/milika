@@ -18,25 +18,6 @@ pub struct Extern {
     pub ret_ty: Ty,
 }
 
-impl Extern {
-    pub fn fun_ty(&self) -> FunTy {
-        FunTy {
-            is_async: self.is_async,
-            param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
-            ret_ty: Box::new(self.ret_ty.clone()),
-        }
-    }
-
-    //pub fn into_empty_func(self) -> Function {
-    //    Function {
-    //        name: self.name,
-    //        params: self.params,
-    //        ret_ty: self.ret_ty,
-    //        body_stmts: Default::default(),
-    //    }
-    //}
-}
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function<'a> {
     pub name: String,
