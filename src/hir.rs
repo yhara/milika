@@ -29,10 +29,10 @@ impl Extern {
             name: x.name.clone(),
             params: x
                 .params
-                .into_iter()
-                .map(|x| x.try_into())
+                .iter()
+                .map(|x| x.clone().try_into())
                 .collect::<Result<_>>()?,
-            ret_ty: x.ret_ty.try_into()?,
+            ret_ty: x.ret_ty.clone().try_into()?,
         })
     }
 
@@ -113,7 +113,6 @@ impl TryFrom<ast::Ty> for Ty {
                 "bool" => Ty::Bool,
                 _ => return Err(anyhow!("unknown type: {s}")),
             },
-            _ => todo!(),
         };
         Ok(t)
     }
@@ -139,9 +138,9 @@ impl FunTy {
             param_tys: f
                 .params
                 .iter()
-                .map(|x| x.ty.try_into())
+                .map(|x| x.ty.clone().try_into())
                 .collect::<Result<_>>()?,
-            ret_ty: Box::new(f.ret_ty.try_into()?),
+            ret_ty: Box::new(f.ret_ty.clone().try_into()?),
         })
     }
 }
