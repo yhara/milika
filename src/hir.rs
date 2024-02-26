@@ -15,20 +15,25 @@ pub struct Extern {
     pub ret_ty: Ty,
 }
 
-impl From<ast::Extern> for Extern {
-    fn from(x: ast::Extern) -> Self {
+impl TryFrom<ast::Extern> for Extern {
+    type Error = anyhow::Error;
+    fn try_from(x: ast::Extern) -> Result<Self> {
         Extern::from_ast(&x)
     }
 }
 
 impl Extern {
-    pub fn from_ast(x: &ast::Extern) -> Self {
-        Self {
+    pub fn from_ast(x: &ast::Extern) -> Result<Self> {
+        Ok(Self {
             is_async: x.is_async,
             name: x.name.clone(),
-            params: x.params.into_iter().map(|x| x.into()).collect(),
-            ret_ty: x.ret_ty.into(),
-        }
+            params: x
+                .params
+                .into_iter()
+                .map(|x| x.try_into())
+                .collect::<Result<_>>()?,
+            ret_ty: x.ret_ty.try_into()?,
+        })
     }
 
     pub fn fun_ty(&self) -> FunTy {
@@ -63,12 +68,14 @@ pub struct Param {
     pub name: String,
 }
 
-impl From<ast::Param> for Param {
-    fn from(x: ast::Param) -> Self {
-        Self {
-            ty: x.ty.into(),
+impl TryFrom<ast::Param> for Param {
+    type Error = anyhow::Error;
+
+    fn try_from(x: ast::Param) -> Result<Self> {
+        Ok(Self {
+            ty: x.ty.try_into()?,
             name: x.name,
-        }
+        })
     }
 }
 
@@ -126,12 +133,16 @@ impl From<FunTy> for Ty {
 }
 
 impl FunTy {
-    pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Self {
-        Self {
+    pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Result<Self> {
+        Ok(Self {
             is_async,
-            param_tys: f.params.iter().map(|x| x.clone().into()).collect(),
-            ret_ty: f.ret_ty.into(),
-        }
+            param_tys: f
+                .params
+                .iter()
+                .map(|x| x.ty.try_into())
+                .collect::<Result<_>>()?,
+            ret_ty: Box::new(f.ret_ty.try_into()?),
+        })
     }
 }
 

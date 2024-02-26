@@ -17,7 +17,7 @@ pub fn run(ast: ast::Program) -> Result<hir::Program> {
     let mut funcs = vec![];
     for decl in ast.0 {
         match decl {
-            ast::Declaration::Extern((e, _)) => externs.push(e.into()),
+            ast::Declaration::Extern((e, _)) => externs.push(e.try_into()?),
             ast::Declaration::Function((f, _)) => {
                 funcs.push(c.compile_func(f)?);
             }
@@ -35,7 +35,11 @@ impl Typing {
             .collect::<Result<Vec<_>>>()?;
         Ok(hir::Function {
             name: f.name,
-            params: f.params.into_iter().map(|x| x.into()).collect::<Vec<_>>(),
+            params: f
+                .params
+                .into_iter()
+                .map(|x| x.try_into())
+                .collect::<Result<Vec<_>>>()?,
             ret_ty: f.ret_ty.try_into()?,
             body_stmts,
         })

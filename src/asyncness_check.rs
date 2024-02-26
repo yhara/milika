@@ -14,7 +14,7 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::Fu
     for decl in decls {
         match decl {
             ast::Declaration::Extern((x, _span)) => {
-                sigs.insert(x.name.clone(), hir::Extern::from_ast(x).fun_ty());
+                sigs.insert(x.name.clone(), hir::Extern::from_ast(x)?.fun_ty());
             }
             ast::Declaration::Function((x, _span)) => {
                 funcs.insert(x.name.clone(), x);
@@ -52,7 +52,7 @@ fn gather_sig(
             Either::Right(b) => is_async = is_async || b,
         }
     }
-    Ok(Either::Right(hir::FunTy::from_ast_func(func, is_async)))
+    Ok(Either::Right(hir::FunTy::from_ast_func(func, is_async)?))
 }
 
 fn check_async(
