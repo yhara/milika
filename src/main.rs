@@ -1,6 +1,6 @@
 mod ast;
 mod typing;
-//mod ast2hir;
+mod async_splitter;
 mod asyncness_check;
 mod compiler;
 mod hir;
