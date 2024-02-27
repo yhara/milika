@@ -176,7 +176,7 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn var_ref(name: impl Into<String>) -> Expr {
-        Expr::VarRef(name.into())
-    }
+    //pub fn var_ref(name: impl Into<String>) -> Expr {
+    //    Expr::VarRef(name.into())
+    //}
 }

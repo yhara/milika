@@ -163,7 +163,12 @@ impl<'c> Compiler<'c> {
             hir::Expr::Number(n) => self.compile_number(block, *n),
             hir::Expr::LVarRef(name) => self.compile_varref(block, lvars, name),
             hir::Expr::ArgRef(name) => self.compile_argref(block, lvars, name),
-            hir::Expr::FuncRef(name) => self.compile_funcref(block, name, &texpr.1)?,
+            hir::Expr::FuncRef(name) => {
+                let hir::Ty::Fun(fun_ty) = &texpr.1 else {
+                    return Err(anyhow!("[BUG] not a function"));
+                };
+                self.compile_funcref(block, name, &fun_ty)
+            }
             hir::Expr::OpCall(op, lhs, rhs) => self.compile_op_call(block, lvars, op, lhs, rhs),
             hir::Expr::FunCall(fexpr, arg_exprs) => {
                 self.compile_funcall(block, lvars, fexpr, arg_exprs)
