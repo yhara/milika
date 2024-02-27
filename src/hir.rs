@@ -62,6 +62,16 @@ pub struct Function {
     pub body_stmts: Vec<Typed<Expr>>,
 }
 
+impl Function {
+    pub fn fun_ty(&self, is_async: bool) -> FunTy {
+        FunTy {
+            is_async,
+            param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
+            ret_ty: Box::new(self.ret_ty.clone()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Param {
     pub ty: Ty,
@@ -146,11 +156,14 @@ impl FunTy {
 }
 
 type Typed<T> = (T, Ty);
+pub type TypedExpr = Typed<Expr>;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
     Number(i64),
-    VarRef(String),
+    LVarRef(String),
+    ArgRef(String),
+    FuncRef(String),
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Option<Vec<Typed<Expr>>>),

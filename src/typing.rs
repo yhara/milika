@@ -58,16 +58,18 @@ impl Typing {
                 (hir::Expr::Number(*n), ty)
             }
             ast::Expr::VarRef(name) => {
-                let ty = if let Some(fun_ty) = self.sigs.get(name) {
-                    fun_ty.clone().into()
+                if let Some(fun_ty) = self.sigs.get(name) {
+                    (hir::Expr::FuncRef(name.to_string()), fun_ty.clone().into())
                 } else if let Some(p) = orig_func.params.iter().find(|x| &x.name == name) {
-                    p.ty.clone().try_into()?
+                    (
+                        hir::Expr::ArgRef(name.to_string()),
+                        p.ty.clone().try_into()?,
+                    )
                 } else if let Some(ty) = lvars.get(name) {
-                    ty.clone()
+                    (hir::Expr::LVarRef(name.to_string()), ty.clone())
                 } else {
                     return Err(anyhow!("unknown variable `{name}'"));
-                };
-                (hir::Expr::VarRef(name.to_string()), ty)
+                }
             }
             ast::Expr::OpCall(op, lhs, rhs) => {
                 let ty = match &op[..] {
