@@ -7,37 +7,22 @@ declare void @free(ptr)
 
 declare i64 @putchar(i64)
 
+declare i64 @chiika_env_push(ptr, ptr)
+
+declare ptr @chiika_env_pop(ptr, i64)
+
+declare i64 @chiika_env_ref(ptr, i64)
+
+declare i64 @chiika_start_tokio(i64)
+
+define i64 @chiika_main() {
+  %1 = call i64 @putchar(i64 70)
+  %2 = call i64 @putchar(i64 72)
+  ret i64 0
+}
+
 define i64 @main() {
-  %1 = alloca i64, i64 1, align 8
-  %2 = insertvalue { ptr, ptr, i64 } undef, ptr %1, 0
-  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1
-  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2
-  %5 = extractvalue { ptr, ptr, i64 } %4, 1
-  store i64 0, ptr %5, align 4
-  %6 = extractvalue { ptr, ptr, i64 } %4, 1
-  %7 = load i64, ptr %6, align 4
-  %8 = icmp ult i64 %7, 3
-  br label %9
-
-9:                                                ; preds = %13, %0
-  %10 = extractvalue { ptr, ptr, i64 } %4, 1
-  %11 = load i64, ptr %10, align 4
-  %12 = icmp ult i64 %11, 3
-  br i1 %12, label %13, label %22
-
-13:                                               ; preds = %9
-  %14 = extractvalue { ptr, ptr, i64 } %4, 1
-  %15 = load i64, ptr %14, align 4
-  %16 = add i64 %15, 80
-  %17 = call i64 @putchar(i64 %16)
-  %18 = extractvalue { ptr, ptr, i64 } %4, 1
-  %19 = load i64, ptr %18, align 4
-  %20 = add i64 %19, 1
-  %21 = extractvalue { ptr, ptr, i64 } %4, 1
-  store i64 %20, ptr %21, align 4
-  br label %9
-
-22:                                               ; preds = %9
+  %1 = call i64 @chiika_start_tokio(i64 0)
   ret i64 0
 }
 

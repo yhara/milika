@@ -60,11 +60,9 @@ impl Typing {
             ast::Expr::VarRef(name) => {
                 if let Some(fun_ty) = self.sigs.get(name) {
                     (hir::Expr::FuncRef(name.to_string()), fun_ty.clone().into())
-                } else if let Some(p) = orig_func.params.iter().find(|x| &x.name == name) {
-                    (
-                        hir::Expr::ArgRef(name.to_string()),
-                        p.ty.clone().try_into()?,
-                    )
+                } else if let Some(i) = orig_func.params.iter().position(|x| &x.name == name) {
+                    let ty = orig_func.params[i].ty.clone().try_into()?;
+                    (hir::Expr::ArgRef(i), ty)
                 } else if let Some(ty) = lvars.get(name) {
                     (hir::Expr::LVarRef(name.to_string()), ty.clone())
                 } else {

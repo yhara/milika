@@ -1,3 +1,7 @@
+NAME = "a"
+CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./target"
+RUNTIME = Dir["chiika_runtime/**/*"]
+RUNTIME_A = File.expand_path "#{CARGO_TARGET}/debug/libchiika_runtime.a"
 PREFIX, SUFFIX =
   if RUBY_PLATFORM =~ /linux/
     ["MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17", "-17"]
@@ -6,14 +10,21 @@ PREFIX, SUFFIX =
   end
 SRC = Dir["src/**/*"]
 
-file "a.mlir" => ["a.milika", *SRC] do
-  sh "cargo fmt"
-  sh "#{PREFIX} cargo run -- a.milika > a.tmp 2>&1"
-  s = File.read("a.tmp")
-  File.write("a.mlir", s[/--CUTHERE--(.*)/m, 1])
+file RUNTIME_A => [*RUNTIME] do
+  cd "chiika_runtime" do
+    sh "cargo fmt"
+    sh "cargo build"
+  end
 end
 
-file "a2.mlir" => ["a.mlir"] do
+file "#{NAME}.mlir" => ["#{NAME}.milika", *SRC] do
+  sh "cargo fmt"
+  sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1"
+  s = File.read("#{NAME}.tmp")
+  File.write("#{NAME}.mlir", s[/--CUTHERE--(.*)/m, 1])
+end
+
+file "#{NAME}2.mlir" => ["#{NAME}.mlir"] do
   sh "mlir-opt#{SUFFIX} \
     --async-func-to-async-runtime \
     --async-to-async-runtime \
@@ -22,11 +33,21 @@ file "a2.mlir" => ["a.mlir"] do
     --convert-scf-to-cf \
     --convert-func-to-llvm \
     --finalize-memref-to-llvm \
-    < a.mlir > a2.mlir"
+    < #{NAME}.mlir > #{NAME}2.mlir"
 end
 
-file "a.ll" => ["a2.mlir"] do
-  sh "mlir-translate#{SUFFIX} --mlir-to-llvmir a2.mlir > a.ll"
+file "#{NAME}.ll" => ["#{NAME}2.mlir"] do
+  sh "mlir-translate#{SUFFIX} --mlir-to-llvmir #{NAME}2.mlir > #{NAME}.ll"
+end
+
+file "#{NAME}.out" => [RUNTIME_A, "#{NAME}.ll"] do
+  sh "clang#{SUFFIX}",
+    "-lm",
+    "-ldl",
+    "-lpthread",
+    "-o", "#{NAME}.out",
+    "#{NAME}.ll",
+    RUNTIME_A
 end
 
 task :default do
@@ -34,8 +55,8 @@ task :default do
   sh "#{PREFIX} cargo run -- a.milika"
 end
 
-task run: "a.ll" do
-  sh "lli#{SUFFIX} a.ll"
+task run: "#{NAME}.out" do
+  sh "./#{NAME}.out"
 end
 
 task a: :default

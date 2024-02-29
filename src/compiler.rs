@@ -113,7 +113,7 @@ impl<'c> Compiler<'c> {
         let mut lvars = TrainMap::new();
         let block = self.create_main_block(&f)?;
         for stmt in &f.body_stmts {
-            self.compile_expr(&block, &mut lvars, stmt)?;
+            self.compile_expr(&block, &block, &mut lvars, stmt)?;
         }
 
         let region = ir::Region::new();
@@ -143,11 +143,12 @@ impl<'c> Compiler<'c> {
 
     fn compile_value_expr<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         expr: &hir::TypedExpr,
     ) -> Result<ir::Value<'c, 'a>> {
-        match self.compile_expr(block, lvars, expr)? {
+        match self.compile_expr(func_block, block, lvars, expr)? {
             Some(v) => Ok(v),
             None => Err(anyhow!("this expression does not have value")),
         }
@@ -155,36 +156,46 @@ impl<'c> Compiler<'c> {
 
     fn compile_expr<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         texpr: &hir::TypedExpr,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         match &texpr.0 {
-            hir::Expr::Number(n) => self.compile_number(block, *n),
-            hir::Expr::LVarRef(name) => self.compile_varref(block, lvars, name),
-            hir::Expr::ArgRef(name) => self.compile_argref(block, lvars, name),
+            hir::Expr::Number(n) => self.compile_number(func_block, block, *n),
+            hir::Expr::LVarRef(name) => self.compile_lvarref(block, lvars, name),
+            hir::Expr::ArgRef(idx) => self.compile_argref(func_block, idx),
             hir::Expr::FuncRef(name) => {
                 let hir::Ty::Fun(fun_ty) = &texpr.1 else {
                     return Err(anyhow!("[BUG] not a function"));
                 };
                 self.compile_funcref(block, name, &fun_ty)
             }
-            hir::Expr::OpCall(op, lhs, rhs) => self.compile_op_call(block, lvars, op, lhs, rhs),
-            hir::Expr::FunCall(fexpr, arg_exprs) => {
-                self.compile_funcall(block, lvars, fexpr, arg_exprs)
+            hir::Expr::OpCall(op, lhs, rhs) => {
+                self.compile_op_call(func_block, block, lvars, op, lhs, rhs)
             }
-            hir::Expr::If(cond, then, els) => self.compile_if(block, lvars, cond, then, els),
-            hir::Expr::While(cond, exprs) => self.compile_while(block, lvars, cond, exprs),
+            hir::Expr::FunCall(fexpr, arg_exprs) => {
+                self.compile_funcall(func_block, block, lvars, fexpr, arg_exprs)
+            }
+            hir::Expr::If(cond, then, els) => {
+                self.compile_if(func_block, block, lvars, cond, then, els)
+            }
+            hir::Expr::While(cond, exprs) => {
+                self.compile_while(func_block, block, lvars, cond, exprs)
+            }
             hir::Expr::Alloc(name) => self.compile_alloc(block, lvars, name),
-            hir::Expr::Assign(name, rhs) => self.compile_assign(block, lvars, name, rhs),
-            hir::Expr::Return(val_expr) => self.compile_return(block, lvars, val_expr),
-            //ast::Expr::Para(exprs) => self.compile_para(block, lvars, exprs),
+            hir::Expr::Assign(name, rhs) => {
+                self.compile_assign(func_block, block, lvars, name, rhs)
+            }
+            hir::Expr::Return(val_expr) => self.compile_return(func_block, block, lvars, val_expr),
+            //ast::Expr::Para(exprs) => self.compile_para(func_block, block, lvars, exprs),
             _ => todo!("{:?}", texpr),
         }
     }
 
     fn compile_op_call<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         operator: &str,
@@ -196,11 +207,11 @@ impl<'c> Compiler<'c> {
             "-" => dialect::arith::subi,
             "*" => dialect::arith::muli,
             "/" => dialect::arith::divsi,
-            _ => return self.compile_cmp(block, lvars, operator, lhs, rhs),
+            _ => return self.compile_cmp(func_block, block, lvars, operator, lhs, rhs),
         };
         let op = f(
-            self.compile_value_expr(block, lvars, lhs)?,
-            self.compile_value_expr(block, lvars, rhs)?,
+            self.compile_value_expr(func_block, block, lvars, lhs)?,
+            self.compile_value_expr(func_block, block, lvars, rhs)?,
             self.unknown_loc(),
         );
         Ok(Some(val(block.append_operation(op))))
@@ -208,6 +219,7 @@ impl<'c> Compiler<'c> {
 
     fn compile_cmp<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         operator: &str,
@@ -226,8 +238,8 @@ impl<'c> Compiler<'c> {
         let op = dialect::arith::cmpi(
             &self.context,
             pred,
-            self.compile_value_expr(block, lvars, lhs)?,
-            self.compile_value_expr(block, lvars, rhs)?,
+            self.compile_value_expr(func_block, block, lvars, lhs)?,
+            self.compile_value_expr(func_block, block, lvars, rhs)?,
             self.unknown_loc(),
         );
         Ok(Some(val(block.append_operation(op))))
@@ -235,6 +247,7 @@ impl<'c> Compiler<'c> {
 
     fn compile_funcall<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         fexpr: &hir::TypedExpr,
@@ -244,11 +257,11 @@ impl<'c> Compiler<'c> {
             return Err(anyhow!("[BUG] not a function"));
         };
 
-        let f = self.compile_value_expr(block, lvars, fexpr)?;
+        let f = self.compile_value_expr(func_block, block, lvars, fexpr)?;
 
         let mut args = vec![];
         for e in arg_exprs {
-            args.push(self.compile_value_expr(block, lvars, e)?.into());
+            args.push(self.compile_value_expr(func_block, block, lvars, e)?.into());
         }
 
         let result_types = fun_ty
@@ -262,21 +275,23 @@ impl<'c> Compiler<'c> {
 
     fn compile_if<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         cond_expr: &hir::TypedExpr,
         then: &[hir::TypedExpr],
         els: &Option<Vec<hir::TypedExpr>>,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
-        let cond_result = self.compile_value_expr(block, lvars, cond_expr)?;
+        let cond_result = self.compile_value_expr(func_block, block, lvars, cond_expr)?;
         let then_region = {
             let region = ir::Region::new();
-            region.append_block(self.compile_exprs(lvars, then, true)?);
+            region.append_block(self.compile_exprs(func_block, lvars, then, true)?);
             region
         };
         let else_region = {
             let region = ir::Region::new();
             region.append_block(self.compile_exprs(
+                func_block,
                 lvars,
                 if let Some(v) = els { v } else { &[] },
                 true,
@@ -296,6 +311,7 @@ impl<'c> Compiler<'c> {
 
     fn compile_while<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         cond_expr: &hir::TypedExpr,
@@ -305,14 +321,14 @@ impl<'c> Compiler<'c> {
             let region = ir::Region::new();
             let block = ir::Block::new(&[]);
             let mut lvars = lvars.fork();
-            let v = self.compile_value_expr(&block, &mut lvars, cond_expr)?;
+            let v = self.compile_value_expr(func_block, &block, &mut lvars, cond_expr)?;
             block.append_operation(dialect::scf::condition(v, &[], self.unknown_loc()));
             region.append_block(block);
             region
         };
         let after_region = {
             let region = ir::Region::new();
-            let block = self.compile_exprs(lvars, exprs, true)?;
+            let block = self.compile_exprs(func_block, lvars, exprs, true)?;
             region.append_block(block);
             region
         };
@@ -347,12 +363,13 @@ impl<'c> Compiler<'c> {
 
     fn compile_assign<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         name: &str,
         rhs: &hir::TypedExpr,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
-        let rhs_result = self.compile_value_expr(block, lvars, rhs)?;
+        let rhs_result = self.compile_value_expr(func_block, block, lvars, rhs)?;
         let Some(lvar) = lvars.get(name) else {
             return Err(anyhow!("unknown lvar {name}"));
         };
@@ -363,17 +380,18 @@ impl<'c> Compiler<'c> {
 
     fn compile_return<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         expr: &hir::TypedExpr,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
-        let v = self.compile_value_expr(block, lvars, expr)?;
+        let v = self.compile_value_expr(func_block, block, lvars, expr)?;
         let op = dialect::func::r#return(&[v], self.unknown_loc());
         block.append_operation(op);
         Ok(None)
     }
 
-    fn compile_varref<'a>(
+    fn compile_lvarref<'a>(
         &self,
         block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
@@ -388,11 +406,10 @@ impl<'c> Compiler<'c> {
 
     fn compile_argref<'a>(
         &self,
-        block: &'a ir::Block<'c>,
-        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
-        name: &str,
+        func_block: &'a ir::Block<'c>,
+        idx: &usize,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
-        todo!();
+        Ok(Some(func_block.argument(*idx)?.into()))
     }
 
     fn compile_funcref<'a>(
@@ -412,6 +429,7 @@ impl<'c> Compiler<'c> {
 
     fn compile_number<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         n: i64,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
@@ -421,6 +439,7 @@ impl<'c> Compiler<'c> {
     /// Returns a newly created region that contains `exprs`.
     fn compile_exprs<'a>(
         &self,
+        func_block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, '_>>,
         exprs: &[hir::TypedExpr],
         terminate: bool,
@@ -428,7 +447,7 @@ impl<'c> Compiler<'c> {
         let block = ir::Block::new(&[]);
         let mut lvars = lvars.fork();
         for expr in exprs {
-            self.compile_expr(&block, &mut lvars, expr)?;
+            self.compile_expr(func_block, &block, &mut lvars, expr)?;
         }
         if terminate {
             let op = dialect::scf::r#yield(&[], self.unknown_loc());

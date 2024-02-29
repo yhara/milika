@@ -30,9 +30,9 @@ fn hir_chiika_start_user(is_async: bool) -> hir::Function {
                     ),
                 );
                 hir::Expr::return_(hir::Expr::fun_call(
-                    hir::Expr::arg_ref("$cont", hir::Ty::ChiikaCont),
+                    hir::Expr::arg_ref(1, hir::Ty::ChiikaCont),
                     vec![
-                        hir::Expr::arg_ref("$env", hir::Ty::ChiikaEnv),
+                        hir::Expr::arg_ref(0, hir::Ty::ChiikaEnv),
                         hir::Expr::fun_call(chiika_main, vec![]),
                     ],
                 ))
@@ -48,8 +48,8 @@ fn hir_chiika_start_user(is_async: bool) -> hir::Function {
                 hir::Expr::return_(hir::Expr::fun_call(
                     chiika_main,
                     vec![
-                        hir::Expr::arg_ref("$env", hir::Ty::ChiikaEnv),
-                        hir::Expr::arg_ref("$cont", hir::Ty::ChiikaCont),
+                        hir::Expr::arg_ref(0, hir::Ty::ChiikaEnv),
+                        hir::Expr::arg_ref(1, hir::Ty::ChiikaCont),
                     ],
                 ))
             };

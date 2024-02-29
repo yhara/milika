@@ -163,7 +163,7 @@ pub type TypedExpr = Typed<Expr>;
 pub enum Expr {
     Number(i64),
     LVarRef(String),
-    ArgRef(String),
+    ArgRef(usize),
     FuncRef(String),
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
@@ -181,8 +181,8 @@ impl Expr {
         (Expr::Number(n), Ty::Int)
     }
 
-    pub fn arg_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
-        (Expr::ArgRef(name.into()), ty)
+    pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
+        (Expr::ArgRef(idx), ty)
     }
 
     pub fn func_ref(name: impl Into<String>, fun_ty: FunTy) -> TypedExpr {
