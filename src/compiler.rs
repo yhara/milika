@@ -483,7 +483,7 @@ impl<'c> Compiler<'c> {
         let t = match ty {
             hir::Ty::Void => return Err(anyhow!("[BUG] void is unexpected")),
             hir::Ty::Opaque | hir::Ty::ChiikaEnv | hir::Ty::ChiikaCont | hir::Ty::RustFuture => {
-                Type::parse(&self.context, "ptr").unwrap()
+                Type::parse(&self.context, "!llvm.ptr").unwrap()
             }
             hir::Ty::Int => self.int_type().into(),
             hir::Ty::Bool => Type::parse(&self.context, "i1").unwrap(),

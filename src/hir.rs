@@ -43,15 +43,6 @@ impl Extern {
             ret_ty: Box::new(self.ret_ty.clone()),
         }
     }
-
-    //pub fn into_empty_func(self) -> Function {
-    //    Function {
-    //        name: self.name,
-    //        params: self.params,
-    //        ret_ty: self.ret_ty,
-    //        body_stmts: Default::default(),
-    //    }
-    //}
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +107,8 @@ impl TryFrom<ast::Ty> for Ty {
     fn try_from(x: ast::Ty) -> Result<Self> {
         let t = match x {
             ast::Ty::Raw(s) => match &s[..] {
+                "void" => Ty::Void,
+                "ANY" => Ty::Opaque,
                 "ENV" => Ty::ChiikaEnv,
                 "CONT" => Ty::ChiikaCont,
                 "FUTURE" => Ty::RustFuture,
@@ -176,7 +169,15 @@ pub enum Expr {
 }
 
 impl Expr {
-    //pub fn var_ref(name: impl Into<String>) -> Expr {
-    //    Expr::VarRef(name.into())
-    //}
+    pub fn number(n: i64) -> TypedExpr {
+        (Expr::Number(n), Ty::Int)
+    }
+
+    pub fn arg_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::ArgRef(name.into()), ty)
+    }
+
+    pub fn func_ref(name: impl Into<String>, fun_ty: FunTy) -> TypedExpr {
+        (Expr::FuncRef(name.into()), fun_ty.into())
+    }
 }
