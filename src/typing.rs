@@ -101,6 +101,7 @@ impl Typing {
                     .collect::<Result<Vec<_>>>()?;
                 check_funcall_arg_types(&fun_ty.param_tys, &args)?;
                 let ty = (*fun_ty.ret_ty).clone();
+                dbg!(&fexpr, &ty);
                 (hir::Expr::FunCall(Box::new(f), args), ty)
             }
             ast::Expr::If(cond_expr, then_exprs, opt_else_exprs) => {

@@ -17,7 +17,14 @@ fn main() -> Result<()> {
     let ast = parser::parse(&src)?;
     let mut hir = typing::run(ast)?;
     //let hir = async_splitter::run(hir)?;
-    hir.funcs.append(&mut prelude::prelude_funcs(false));
+
+    let prelude = prelude::prelude_funcs(false);
+    let prelude_ast = parser::parse(&prelude)?;
+    let mut prelude_hir = typing::run(prelude_ast)?;
+
+    hir.externs.append(&mut prelude_hir.externs);
+    hir.funcs.append(&mut prelude_hir.funcs);
+
     compiler::run(path, &src, hir)?;
     Ok(())
 }

@@ -69,7 +69,6 @@ pub enum Expr<'a> {
         Option<Vec<SpannedExpr<'a>>>,
     ),
     While(Box<SpannedExpr<'a>>, Vec<SpannedExpr<'a>>),
-    Cast(Box<SpannedExpr<'a>>, Ty),
     Alloc(String),
     Assign(String, Box<SpannedExpr<'a>>),
     Return(Box<SpannedExpr<'a>>),

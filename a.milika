@@ -16,20 +16,3 @@ fun chiika_main() -> int {
   putchar(72);
   return 0;
 }
-
-# TODO: these should be moved to prelude.rs
-extern chiika_env_push(ENV env, ANY obj) -> int;
-extern chiika_env_pop(ENV env, int n) -> ANY;
-extern chiika_env_ref(ENV env, int n) -> int;
-extern chiika_start_tokio(int n) -> int;
-##func chiika_start_user($ENV $env, $FN(($ENV, $any) -> $FUTURE) $cont) -> $FUTURE {
-#fun chiika_start_user__sync(ENV env, CONT cont) -> FUTURE {
-#  return chiika_main(env, cont);
-#}
-#fun chiika_start_user__async(ENV env, CONT cont) -> FUTURE {
-#  return cont(env, chiika_main());
-#}
-fun main() -> int {
-  chiika_start_tokio(0);
-  return 0;
-}

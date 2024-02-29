@@ -94,7 +94,6 @@ pub enum Ty {
     Void,
     Opaque, // Its type is unknown to Milika
     ChiikaEnv,
-    ChiikaCont,
     RustFuture,
     Int,
     Bool,
@@ -110,14 +109,24 @@ impl TryFrom<ast::Ty> for Ty {
                 "void" => Ty::Void,
                 "ANY" => Ty::Opaque,
                 "ENV" => Ty::ChiikaEnv,
-                "CONT" => Ty::ChiikaCont,
                 "FUTURE" => Ty::RustFuture,
+                "CONT" => Ty::chiika_cont(),
                 "int" => Ty::Int,
                 "bool" => Ty::Bool,
                 _ => return Err(anyhow!("unknown type: {s}")),
             },
         };
         Ok(t)
+    }
+}
+
+impl Ty {
+    pub fn chiika_cont() -> Ty {
+        Ty::Fun(FunTy {
+            is_async: false,
+            param_tys: vec![Ty::ChiikaEnv, Ty::Opaque],
+            ret_ty: Box::new(Ty::RustFuture),
+        })
     }
 }
 
@@ -169,7 +178,6 @@ pub enum Expr {
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Option<Vec<Typed<Expr>>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
-    Cast(Box<Typed<Expr>>, Ty),
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
@@ -177,9 +185,9 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn number(n: i64) -> TypedExpr {
-        (Expr::Number(n), Ty::Int)
-    }
+    //pub fn number(n: i64) -> TypedExpr {
+    //    (Expr::Number(n), Ty::Int)
+    //}
 
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
         (Expr::ArgRef(idx), ty)

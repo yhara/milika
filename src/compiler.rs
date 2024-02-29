@@ -20,7 +20,7 @@ use train_map::TrainMap;
 /// Panics if the operation yields no value
 fn val<'c, 'a>(x: ir::OperationRef<'c, 'a>) -> ir::Value<'c, 'a> {
     x.result(0)
-        .unwrap_or_else(|e| panic!("this operation has no value: {e}"))
+        .unwrap_or_else(|_| panic!("this operation has no value: {x}"))
         .into()
 }
 
@@ -33,12 +33,12 @@ fn val<'c, 'a>(x: ir::OperationRef<'c, 'a>) -> ir::Value<'c, 'a> {
 //}
 
 struct Compiler<'c> {
-    filename: &'c str,
-    src: &'c str,
+    //filename: &'c str,
+    //src: &'c str,
     context: &'c melior::Context,
 }
 
-pub fn run(filename: &str, src: &str, prog: hir::Program) -> Result<()> {
+pub fn run(_filename: &str, _src: &str, prog: hir::Program) -> Result<()> {
     let registry = DialectRegistry::new();
     register_all_dialects(&registry);
 
@@ -48,8 +48,8 @@ pub fn run(filename: &str, src: &str, prog: hir::Program) -> Result<()> {
     register_all_llvm_translations(&context);
 
     let c = Compiler {
-        filename,
-        src,
+        //filename,
+        //src,
         context: &context,
     };
     c.compile_program(prog)?;
@@ -161,13 +161,14 @@ impl<'c> Compiler<'c> {
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         texpr: &hir::TypedExpr,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
+        dbg!(&texpr);
         match &texpr.0 {
-            hir::Expr::Number(n) => self.compile_number(func_block, block, *n),
+            hir::Expr::Number(n) => self.compile_number(block, *n),
             hir::Expr::LVarRef(name) => self.compile_lvarref(block, lvars, name),
             hir::Expr::ArgRef(idx) => self.compile_argref(func_block, idx),
             hir::Expr::FuncRef(name) => {
                 let hir::Ty::Fun(fun_ty) = &texpr.1 else {
-                    return Err(anyhow!("[BUG] not a function"));
+                    return Err(anyhow!("[BUG] not a function: {:?}", texpr.1));
                 };
                 self.compile_funcref(block, name, &fun_ty)
             }
@@ -254,7 +255,7 @@ impl<'c> Compiler<'c> {
         arg_exprs: &[hir::TypedExpr],
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         let hir::Ty::Fun(fun_ty) = &fexpr.1 else {
-            return Err(anyhow!("[BUG] not a function"));
+            return Err(anyhow!("[BUG] not a function: {:?}", fexpr.1));
         };
 
         let f = self.compile_value_expr(func_block, block, lvars, fexpr)?;
@@ -264,11 +265,7 @@ impl<'c> Compiler<'c> {
             args.push(self.compile_value_expr(func_block, block, lvars, e)?.into());
         }
 
-        let result_types = fun_ty
-            .param_tys
-            .iter()
-            .map(|t| self.mlir_type(t))
-            .collect::<Result<Vec<_>>>()?;
+        let result_types = vec![self.mlir_type(&fun_ty.ret_ty)?];
         let op = dialect::func::call_indirect(f, &args, &result_types, self.unknown_loc());
         Ok(Some(val(block.append_operation(op))))
     }
@@ -429,7 +426,6 @@ impl<'c> Compiler<'c> {
 
     fn compile_number<'a>(
         &self,
-        func_block: &'a ir::Block<'c>,
         block: &'a ir::Block<'c>,
         n: i64,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
@@ -501,7 +497,7 @@ impl<'c> Compiler<'c> {
     fn mlir_type(&self, ty: &hir::Ty) -> Result<ir::Type<'c>> {
         let t = match ty {
             hir::Ty::Void => return Err(anyhow!("[BUG] void is unexpected")),
-            hir::Ty::Opaque | hir::Ty::ChiikaEnv | hir::Ty::ChiikaCont | hir::Ty::RustFuture => {
+            hir::Ty::Opaque | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => {
                 Type::parse(&self.context, "!llvm.ptr").unwrap()
             }
             hir::Ty::Int => self.int_type().into(),
