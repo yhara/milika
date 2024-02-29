@@ -4,6 +4,7 @@ mod asyncness_check;
 mod compiler;
 mod hir;
 mod parser;
+mod prelude;
 mod typing;
 use anyhow::{bail, Context, Result};
 
@@ -14,8 +15,9 @@ fn main() -> Result<()> {
     };
     let src: String = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
     let ast = parser::parse(&src)?;
-    let hir = typing::run(ast)?;
+    let mut hir = typing::run(ast)?;
     //let hir = async_splitter::run(hir)?;
+    hir.funcs.append(&mut prelude::prelude_funcs(false));
     compiler::run(path, &src, hir)?;
     Ok(())
 }

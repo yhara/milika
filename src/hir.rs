@@ -135,6 +135,14 @@ impl From<FunTy> for Ty {
 }
 
 impl FunTy {
+    pub fn sync(param_tys: Vec<Ty>, ret_ty: Ty) -> FunTy {
+        FunTy {
+            is_async: false,
+            param_tys,
+            ret_ty: Box::new(ret_ty),
+        }
+    }
+
     pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Result<Self> {
         Ok(Self {
             is_async,
@@ -179,5 +187,14 @@ impl Expr {
 
     pub fn func_ref(name: impl Into<String>, fun_ty: FunTy) -> TypedExpr {
         (Expr::FuncRef(name.into()), fun_ty.into())
+    }
+
+    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
+        let t = func.1.clone().into();
+        (Expr::FunCall(Box::new(func), args), t)
+    }
+
+    pub fn return_(e: TypedExpr) -> TypedExpr {
+        (Expr::Return(Box::new(e)), Ty::Void)
     }
 }
