@@ -29,16 +29,6 @@ pub struct Function<'a> {
     pub body_stmts: Vec<SpannedExpr<'a>>,
 }
 
-impl<'a> Function<'a> {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy {
-        FunTy {
-            is_async,
-            param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
-            ret_ty: Box::new(self.ret_ty.clone()),
-        }
-    }
-}
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct Param {
     pub ty: Ty,

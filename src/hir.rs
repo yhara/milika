@@ -82,15 +82,6 @@ impl TryFrom<ast::Param> for Param {
     }
 }
 
-impl Param {
-    pub fn new(ty: Ty, name: &str) -> Param {
-        Param {
-            ty,
-            name: name.to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
     Void,
@@ -146,14 +137,6 @@ impl From<FunTy> for Ty {
 }
 
 impl FunTy {
-    pub fn sync(param_tys: Vec<Ty>, ret_ty: Ty) -> FunTy {
-        FunTy {
-            is_async: false,
-            param_tys,
-            ret_ty: Box::new(ret_ty),
-        }
-    }
-
     pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Result<Self> {
         Ok(Self {
             is_async,
@@ -184,27 +167,4 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Para(Vec<Typed<Expr>>),
-}
-
-impl Expr {
-    //pub fn number(n: i64) -> TypedExpr {
-    //    (Expr::Number(n), Ty::Int)
-    //}
-
-    pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
-        (Expr::ArgRef(idx), ty)
-    }
-
-    pub fn func_ref(name: impl Into<String>, fun_ty: FunTy) -> TypedExpr {
-        (Expr::FuncRef(name.into()), fun_ty.into())
-    }
-
-    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
-        let t = func.1.clone().into();
-        (Expr::FunCall(Box::new(func), args), t)
-    }
-
-    pub fn return_(e: TypedExpr) -> TypedExpr {
-        (Expr::Return(Box::new(e)), Ty::Void)
-    }
 }
