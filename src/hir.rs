@@ -82,6 +82,15 @@ impl TryFrom<ast::Param> for Param {
     }
 }
 
+impl Param {
+    pub fn new(ty: Ty, name: impl Into<String>) -> Self {
+        Self {
+            ty,
+            name: name.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
     Void,

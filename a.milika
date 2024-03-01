@@ -1,5 +1,5 @@
 extern putchar(int n) -> int;
-#extern_async sleep_sec(int n) -> int;
+extern(async) sleep_sec(int n) -> int;
 
 #fun main() -> int {
 #  alloc a;
@@ -13,6 +13,7 @@ extern putchar(int n) -> int;
 
 fun chiika_main() -> int {
   putchar(70);
+  sleep_sec(1);
   putchar(72);
   return 0;
 }

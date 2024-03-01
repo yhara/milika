@@ -7,6 +7,8 @@ declare void @free(ptr)
 
 declare i64 @putchar(i64)
 
+declare i64 @sleep_sec(i64)
+
 declare i64 @chiika_env_push(ptr, ptr)
 
 declare ptr @chiika_env_pop(ptr, i64)
@@ -17,7 +19,8 @@ declare i64 @chiika_start_tokio(i64)
 
 define i64 @chiika_main() {
   %1 = call i64 @putchar(i64 70)
-  %2 = call i64 @putchar(i64 72)
+  %2 = call i64 @sleep_sec(i64 1)
+  %3 = call i64 @putchar(i64 72)
   ret i64 0
 }
 

@@ -1,5 +1,6 @@
 module attributes {llvm.data_layout = ""} {
   llvm.func @putchar(i64) -> i64 attributes {sym_visibility = "private"}
+  llvm.func @sleep_sec(i64) -> i64 attributes {sym_visibility = "private"}
   llvm.func @chiika_env_push(!llvm.ptr, !llvm.ptr) -> i64 attributes {sym_visibility = "private"}
   llvm.func @chiika_env_pop(!llvm.ptr, i64) -> !llvm.ptr attributes {sym_visibility = "private"}
   llvm.func @chiika_env_ref(!llvm.ptr, i64) -> i64 attributes {sym_visibility = "private"}
@@ -8,11 +9,14 @@ module attributes {llvm.data_layout = ""} {
     %0 = llvm.mlir.addressof @putchar : !llvm.ptr
     %1 = llvm.mlir.constant(70 : i64) : i64
     %2 = llvm.call %0(%1) : !llvm.ptr, (i64) -> i64
-    %3 = llvm.mlir.addressof @putchar : !llvm.ptr
-    %4 = llvm.mlir.constant(72 : i64) : i64
+    %3 = llvm.mlir.addressof @sleep_sec : !llvm.ptr
+    %4 = llvm.mlir.constant(1 : i64) : i64
     %5 = llvm.call %3(%4) : !llvm.ptr, (i64) -> i64
-    %6 = llvm.mlir.constant(0 : i64) : i64
-    llvm.return %6 : i64
+    %6 = llvm.mlir.addressof @putchar : !llvm.ptr
+    %7 = llvm.mlir.constant(72 : i64) : i64
+    %8 = llvm.call %6(%7) : !llvm.ptr, (i64) -> i64
+    %9 = llvm.mlir.constant(0 : i64) : i64
+    llvm.return %9 : i64
   }
   llvm.func @chiika_start_user(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
     %0 = llvm.mlir.addressof @chiika_main : !llvm.ptr

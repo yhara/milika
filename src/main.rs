@@ -1,5 +1,5 @@
 mod ast;
-//mod async_splitter;
+mod async_splitter;
 mod asyncness_check;
 mod compiler;
 mod hir;
@@ -16,14 +16,7 @@ fn main() -> Result<()> {
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
     let mut hir = compile(&src)?;
 
-    let main_is_async = hir
-        .funcs
-        .iter()
-        .find(|x| x.name == "chiika_main")
-        .map(|x| x.is_async.expect("[BUG] chiika_main's asyncness not known"))
-        .expect("chiika_main not found");
-
-    let prelude_txt = prelude::prelude_funcs(main_is_async);
+    let prelude_txt = prelude::prelude_funcs(main_is_async(hir)?);
     let mut prelude_hir = compile(&prelude_txt)?;
     for e in prelude_hir.externs {
         if !e.is_internal {
@@ -41,4 +34,12 @@ fn compile(src: &str) -> Result<hir::Program> {
     let hir = typing::run(ast)?;
     let hir = async_splitter::run(hir)?;
     Ok(hir)
+}
+
+fn main_is_async(hir: &hir::Program) -> Result<bool> {
+    let Some(main) = hir.funcs.iter().find(|x| x.name == "chiika_main") else {
+        bail!("chiika_main not found");
+    };
+    // When chiika_main calls async function, it is lowered to take a continuation.
+    Ok(main.params.len() > 0)
 }
