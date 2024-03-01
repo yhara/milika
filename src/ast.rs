@@ -12,7 +12,10 @@ pub enum Declaration<'a> {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Extern {
+    // Denotes the rust-implemented function returns Future
     pub is_async: bool,
+    // Used in prelude.rs
+    pub is_internal: bool,
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,

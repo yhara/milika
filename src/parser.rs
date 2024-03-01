@@ -75,19 +75,36 @@ fn parse_decl<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>, E> {
 
 fn parse_extern<'a>(s: Span<'a>) -> IResult<Span<'a>, ast::Declaration<'a>, E> {
     let (s, _) = tag("extern")(s)?;
+    let (s, opts) = opt(parse_extern_flags)(s)?;
     let (s, _) = multispace1(s)?;
     let (s, (name, pos)) = parse_ident(s)?;
     let (s, params) = parse_param_list(s)?;
     let (s, _) = delimited(multispace0, tag("->"), multispace0)(s)?;
     let (s, (ret_ty, _)) = parse_ty(s)?;
     let (s, _) = preceded(multispace0, tag(";"))(s)?;
+
+    let mut is_async = false;
+    let mut is_internal = false;
+    for flag in opts.unwrap_or_default() {
+        match &flag.0[..] {
+            "async" => is_async = true,
+            "internal" => is_internal = true,
+            _ => panic!("unknown extern flag: {:?}", flag),
+        }
+    }
+
     let e = ast::Extern {
-        is_async: false,
+        is_async,
+        is_internal,
         name,
         params,
         ret_ty,
     };
     Ok((s, ast::Declaration::Extern((e, pos))))
+}
+
+fn parse_extern_flags<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<Spanned<String>>, E> {
+    delimited(tag("("), separated_list0(tag(","), parse_ident), tag(")"))(s)
 }
 
 fn parse_param_list<'a>(s: Span<'a>) -> IResult<Span<'a>, Vec<ast::Param>, E> {

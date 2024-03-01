@@ -10,6 +10,7 @@ pub struct Program {
 #[derive(Debug, Clone)]
 pub struct Extern {
     pub is_async: bool,
+    pub is_internal: bool,
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
@@ -26,6 +27,7 @@ impl Extern {
     pub fn from_ast(x: &ast::Extern) -> Result<Self> {
         Ok(Self {
             is_async: x.is_async,
+            is_internal: x.is_internal,
             name: x.name.clone(),
             params: x
                 .params
