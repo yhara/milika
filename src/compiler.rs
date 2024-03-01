@@ -161,7 +161,6 @@ impl<'c> Compiler<'c> {
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         texpr: &hir::TypedExpr,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
-        dbg!(&texpr);
         match &texpr.0 {
             hir::Expr::Number(n) => self.compile_number(block, *n),
             hir::Expr::LVarRef(name) => self.compile_lvarref(block, lvars, name),
