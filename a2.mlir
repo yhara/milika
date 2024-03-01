@@ -14,6 +14,12 @@ module attributes {llvm.data_layout = ""} {
     %6 = llvm.mlir.constant(0 : i64) : i64
     llvm.return %6 : i64
   }
+  llvm.func @chiika_start_user(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
+    %0 = llvm.mlir.addressof @chiika_main : !llvm.ptr
+    %1 = llvm.call %0() : !llvm.ptr, () -> i64
+    %2 = llvm.call %arg1(%arg0, %1) : !llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr
+    llvm.return %2 : !llvm.ptr
+  }
   llvm.func @main() -> i64 {
     %0 = llvm.mlir.addressof @chiika_start_tokio : !llvm.ptr
     %1 = llvm.mlir.constant(0 : i64) : i64

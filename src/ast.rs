@@ -38,12 +38,11 @@ pub struct Param {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Ty {
     Raw(String),
-    //Fun(FunTy),
+    Fun(FunTy),
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct FunTy {
-    pub is_async: bool,
     pub param_tys: Vec<Ty>,
     pub ret_ty: Box<Ty>,
 }

@@ -21,6 +21,12 @@ define i64 @chiika_main() {
   ret i64 0
 }
 
+define ptr @chiika_start_user(ptr %0, ptr %1) {
+  %3 = call i64 @chiika_main()
+  %4 = call ptr %1(ptr %0, i64 %3)
+  ret ptr %4
+}
+
 define i64 @main() {
   %1 = call i64 @chiika_start_tokio(i64 0)
   ret i64 0

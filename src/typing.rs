@@ -1,7 +1,7 @@
 use crate::ast;
 use crate::asyncness_check;
 use crate::hir;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 
 struct Typing {
@@ -99,7 +99,8 @@ impl Typing {
                     .into_iter()
                     .map(|e| self.compile_expr(orig_func, lvars, &e.0))
                     .collect::<Result<Vec<_>>>()?;
-                check_funcall_arg_types(&fun_ty.param_tys, &args)?;
+                check_funcall_arg_types(&fun_ty.param_tys, &args)
+                    .context(format!("Invalid call: fexpr: {:?}", fexpr))?;
                 let ty = (*fun_ty.ret_ty).clone();
                 dbg!(&fexpr, &ty);
                 (hir::Expr::FunCall(Box::new(f), args), ty)

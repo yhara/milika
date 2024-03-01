@@ -17,7 +17,7 @@ pub fn prelude_funcs(main_is_async: bool) -> String {
         extern chiika_env_pop(ENV env, int n) -> ANY;
         extern chiika_env_ref(ENV env, int n) -> int;
         extern chiika_start_tokio(int n) -> int;
-        fun chiika_start_user(ENV env, CONT cont) -> FUTURE {
+        fun chiika_start_user(ENV env, FN((ENV,int)->FUTURE) cont) -> FUTURE {
     " + call_uesr_main
         + "
         }

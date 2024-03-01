@@ -339,6 +339,24 @@ fn parse_ident<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<String>, E> {
 }
 
 fn parse_ty<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Ty>, E> {
+    alt((parse_ty_fun, parse_ty_raw))(s)
+}
+
+fn parse_ty_fun<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Ty>, E> {
+    let (s, pos) = position(s)?;
+    let (s, _) = tag("FN(")(s)?;
+    let (s, param_tys) = delimited(tag("("), separated_list0(tag(","), parse_ty), tag(")"))(s)?;
+    let (s, _) = tag("->")(s)?;
+    let (s, (ret_ty, _)) = parse_ty(s)?;
+    let (s, _) = tag(")")(s)?;
+    let fun_ty = ast::FunTy {
+        param_tys: param_tys.into_iter().map(|(ty, _)| ty).collect(),
+        ret_ty: Box::new(ret_ty),
+    };
+    Ok((s, (ast::Ty::Fun(fun_ty), pos)))
+}
+
+fn parse_ty_raw<'a>(s: Span<'a>) -> IResult<Span<'a>, Spanned<ast::Ty>, E> {
     let (s, pos) = position(s)?;
     let (s, name) = alphanumeric1(s)?;
     Ok((s, (ast::Ty::Raw(name.to_string()), pos)))

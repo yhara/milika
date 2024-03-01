@@ -108,6 +108,7 @@ impl TryFrom<ast::Ty> for Ty {
                 "bool" => Ty::Bool,
                 _ => return Err(anyhow!("unknown type: {s}")),
             },
+            ast::Ty::Fun(f) => Ty::Fun(f.try_into()?),
         };
         Ok(t)
     }
@@ -133,6 +134,22 @@ pub struct FunTy {
 impl From<FunTy> for Ty {
     fn from(x: FunTy) -> Self {
         Ty::Fun(x)
+    }
+}
+
+impl TryFrom<ast::FunTy> for FunTy {
+    type Error = anyhow::Error;
+
+    fn try_from(x: ast::FunTy) -> Result<Self> {
+        Ok(Self {
+            is_async: false,
+            param_tys: x
+                .param_tys
+                .into_iter()
+                .map(|x| x.try_into())
+                .collect::<Result<_>>()?,
+            ret_ty: Box::new((*x.ret_ty).try_into()?),
+        })
     }
 }
 
