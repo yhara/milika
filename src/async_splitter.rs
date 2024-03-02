@@ -105,6 +105,8 @@ impl AsyncSplitter {
         Ok(split_funcs)
     }
 
+    /// Examine each expression for special care. Most important part is
+    /// calling async function.
     fn compile_expr(
         &mut self,
         orig_func: &hir::Function,
@@ -112,19 +114,20 @@ impl AsyncSplitter {
     ) -> Result<hir::TypedExpr> {
         let new_e = match e.0 {
             hir::Expr::Number(n) => e,
-            hir::Expr::LVarRef(ref name) | hir::Expr::ArgRef(ref name) => {
+            hir::Expr::LVarRef(ref name) => {
                 if self.chapters.len() == 1 {
                     // The variable is just there in the first chapter
                     e
                 } else {
-                    if matches!(e.0, hir::Expr::LVarRef(_)) {
-                        todo!("local variable in async function");
-                    }
-                    let idx = orig_func
-                        .params
-                        .iter()
-                        .position(|x| x.name == *name)
-                        .expect(&format!("unknown variable `{}'", name));
+                    // We need to carry the variable via env
+                    todo!()
+                }
+            }
+            hir::Expr::ArgRef(idx) => {
+                if self.chapters.len() == 1 {
+                    // The variable is just there in the first chapter
+                    e
+                } else {
                     hir::Expr::FunCall(
                         Box::new(func_ref_env_ref()),
                         vec![arg_ref_env(), hir::Expr::Number(idx as i64)],
@@ -154,8 +157,7 @@ impl AsyncSplitter {
                             self.chapters.len(),
                         )),
                     );
-                    let cps_call =
-                        hir::Expr::FunCall(Box::new(hir::Expr::VarRef(callee_name)), new_args);
+                    let cps_call = hir::Expr::FunCall(Box::new(fexpr), new_args);
 
                     // Change chapter here
                     let async_result_ty = (*fun_ty.ret_ty).clone().into();
@@ -166,13 +168,14 @@ impl AsyncSplitter {
 
                     arg_ref_async_result(async_result_ty)
                 } else {
-                    hir::Expr::FunCall(Box::new(hir::Expr::VarRef(callee_name)), new_args)
+                    hir::Expr::FunCall(Box::new(fexpr), new_args)
                 }
             }
             hir::Expr::Assign(name, rhs) => {
                 hir::Expr::Assign(name, Box::new(self.compile_expr(orig_func, rhs.0)?))
             }
             //hir::Expr::While(cond_expr, body_exprs) => todo!(),
+            //hir::Expr::If(cond_expr, then_exprs, else_exprs) => todo!(),
             hir::Expr::Alloc(name) => e,
             hir::Expr::Return(expr) => {
                 hir::Expr::Return(Box::new(self.compile_expr(orig_func, expr.0)?))
