@@ -1,5 +1,5 @@
 use crate::hir;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -128,16 +128,16 @@ impl AsyncSplitter {
                     // The variable is just there in the first chapter
                     e
                 } else {
-                    hir::Expr::FunCall(
-                        Box::new(func_ref_env_ref()),
-                        vec![arg_ref_env(), hir::Expr::Number(idx as i64)],
+                    hir::Expr::fun_call(
+                        func_ref_env_ref(),
+                        vec![arg_ref_env(), hir::Expr::number(idx as i64)],
                     )
                 }
             }
             hir::Expr::FuncRef(_) => e,
             hir::Expr::OpCall(op, lhs, rhs) => {
-                let l = self.compile_expr(orig_func, lhs.0)?;
-                let r = self.compile_expr(orig_func, rhs.0)?;
+                let l = self.compile_expr(orig_func, lhs)?;
+                let r = self.compile_expr(orig_func, rhs)?;
                 hir::Expr::OpCall(op, Box::new(l), Box::new(r))
             }
             hir::Expr::FunCall(fexpr, arg_exprs) => {
@@ -201,6 +201,7 @@ fn prepend_async_params(params: &[hir::Param], result_ty: hir::Ty) -> Vec<hir::P
     new_params
 }
 
+/// Prepend successive calls of `chiika_env_push` to `stmts`
 fn prepend_async_intro(
     orig_func: &hir::Function,
     mut stmts: Vec<hir::TypedExpr>,
@@ -222,25 +223,29 @@ fn prepend_async_intro(
     push_calls
 }
 
+/// Appends successive calls of `chiika_env_pop` and a call of original `$cont` to `stmts`
 fn append_async_outro(
     orig_func: &hir::Function,
     mut stmts: Vec<hir::TypedExpr>,
     result_ty: hir::Ty,
 ) -> Vec<hir::TypedExpr> {
-    let result_value = stmts.pop().unwrap();
-    let n_pop = orig_func.params.len() + 1; // +1 for $cont
-    let env_pop = hir::Expr::FunCall(
-        Box::new(func_ref_env_pop()),
-        vec![arg_ref_env(), hir::Expr::Number(n_pop as i64)],
-    );
-    let fun_ty = hir::FunTy {
-        is_async: false, // chiika-1 does not have notion of asyncness
-        param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
-        ret_ty: Box::new(hir::Ty::RustFuture),
+    let (hir::Expr::Return(ret_val), _) = stmts.pop().unwrap() else {
+        bail!("TODO: async func must end with `return` now");
     };
-    let cast = hir::Expr::Cast(Box::new(env_pop), hir::Ty::Fun(fun_ty));
-    let call_cont = hir::Expr::FunCall(Box::new(cast), vec![arg_ref_env(), result_value]);
-    stmts.push(call_cont);
+    let cont = {
+        let cont_ty = hir::FunTy {
+            is_async: false,
+            param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
+            ret_ty: Box::new(hir::Ty::RustFuture),
+        };
+        let env_pop = func_ref_env_pop(cont_ty.clone());
+        let n_pop = orig_func.params.len() + 1; // +1 for $cont
+        hir::Expr::fun_call(
+            env_pop,
+            vec![arg_ref_env(), hir::Expr::number(n_pop as i64)],
+        )
+    };
+    stmts.push(hir::Expr::fun_call(cont, vec![arg_ref_env(), ret_val]));
     stmts
 }
 
@@ -249,19 +254,30 @@ fn chapter_func_name(orig_name: &str, chapter_idx: usize) -> String {
     format!("{}_{}", orig_name, chapter_idx)
 }
 
+/// Get the `$env` which is 0-th param of current func
 fn arg_ref_env() -> hir::TypedExpr {
-    hir::Expr::arg_ref("$env", hir::Ty::ChiikaEnv)
+    hir::Expr::arg_ref(0, hir::Ty::ChiikaEnv)
+}
+
+/// Get the `$cont` which is 1-th param of current func
+fn arg_ref_cont(result_ty: hir::Ty) -> hir::TypedExpr {
+    let cont_ty = hir::FunTy {
+        is_async: false,
+        param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
+        ret_ty: Box::new(hir::Ty::RustFuture),
+    };
+    hir::Expr::arg_ref(1, hir::Ty::Fun(cont_ty))
 }
 
 fn arg_ref_async_result(ty: hir::Ty) -> hir::TypedExpr {
     hir::Expr::arg_ref("$async_result", ty)
 }
 
-fn func_ref_env_pop() -> hir::TypedExpr {
+fn func_ref_env_pop(cont_arg_ty: hir::Ty) -> hir::TypedExpr {
     let fun_ty = hir::FunTy {
         is_async: false,
         param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
-        ret_ty: Box::new(hir::Ty::Opaque),
+        ret_ty: Box::new(cont_arg_ty),
     };
     hir::Expr::func_ref("chiika_env_pop", fun_ty)
 }

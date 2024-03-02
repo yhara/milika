@@ -194,3 +194,26 @@ pub enum Expr {
     Return(Box<Typed<Expr>>),
     Para(Vec<Typed<Expr>>),
 }
+
+impl Expr {
+    pub fn number(n: i64) -> TypedExpr {
+        (Expr::Number(n), Ty::Int)
+    }
+
+    pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
+        (Expr::ArgRef(idx), ty)
+    }
+
+    pub fn func_ref(name: impl Into<String>, fun_ty: FunTy) -> TypedExpr {
+        (Expr::FuncRef(name.into()), fun_ty.into())
+    }
+
+    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
+        let t = func.1.clone().into();
+        (Expr::FunCall(Box::new(func), args), t)
+    }
+
+    pub fn return_(e: TypedExpr) -> TypedExpr {
+        (Expr::Return(Box::new(e)), Ty::Void)
+    }
+}
