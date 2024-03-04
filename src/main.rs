@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
     let mut hir = compile(&src)?;
 
-    let prelude_txt = prelude::prelude_funcs(main_is_async(hir)?);
+    let prelude_txt = prelude::prelude_funcs(main_is_async(&hir)?);
     let mut prelude_hir = compile(&prelude_txt)?;
     for e in prelude_hir.externs {
         if !e.is_internal {

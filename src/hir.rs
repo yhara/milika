@@ -208,9 +208,16 @@ impl Expr {
         (Expr::FuncRef(name.into()), fun_ty.into())
     }
 
-    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
-        let t = func.1.clone().into();
-        (Expr::FunCall(Box::new(func), args), t)
+    pub fn op_call(op: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr, ty: Ty) -> TypedExpr {
+        (Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty)
+    }
+
+    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>, result_ty: Ty) -> TypedExpr {
+        (Expr::FunCall(Box::new(func), args), result_ty)
+    }
+
+    pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
+        (Expr::Assign(name.into(), Box::new(e)), Ty::Void)
     }
 
     pub fn return_(e: TypedExpr) -> TypedExpr {
