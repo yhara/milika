@@ -140,7 +140,12 @@ impl Typing {
             ast::Expr::Return(val_expr) => {
                 let v = self.compile_expr(orig_func, lvars, &val_expr.0)?;
                 if v.1 != orig_func.ret_ty.clone().try_into()? {
-                    return Err(anyhow!("return type mismatch"));
+                    return Err(anyhow!(
+                        "return type mismatch: {} should return {:?} but got {:?}",
+                        orig_func.name,
+                        orig_func.ret_ty,
+                        v.1
+                    ));
                 }
                 let ty = hir::Ty::Void;
                 (hir::Expr::Return(Box::new(v)), ty)
