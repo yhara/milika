@@ -6,6 +6,7 @@ mod hir;
 mod parser;
 mod prelude;
 mod typing;
+mod verifier;
 use anyhow::{bail, Context, Result};
 
 fn main() -> Result<()> {
@@ -24,6 +25,8 @@ fn main() -> Result<()> {
         }
     }
     hir.funcs.append(&mut prelude_hir.funcs);
+
+    verifier::run(&hir)?;
 
     compiler::run(path, &src, hir)?;
     Ok(())

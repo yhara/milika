@@ -192,7 +192,14 @@ pub enum Expr {
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
+    Cast(CastType, Box<Typed<Expr>>),
     Para(Vec<Typed<Expr>>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CastType {
+    IntToBool,
+    BoolToInt,
 }
 
 impl Expr {
