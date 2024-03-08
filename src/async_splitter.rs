@@ -278,13 +278,8 @@ fn append_async_outro(
             param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
             ret_ty: Box::new(hir::Ty::RustFuture),
         });
-        let env_pop = func_ref_env_pop(cont_ty.clone());
         let n_pop = orig_func.params.len() + 1; // +1 for $cont
-        hir::Expr::fun_call(
-            env_pop,
-            vec![arg_ref_env(), hir::Expr::number(n_pop as i64)],
-            cont_ty,
-        )
+        call_chiika_env_pop(n_pop, cont_ty)
     };
     stmts.push(hir::Expr::fun_call(
         cont,
@@ -320,19 +315,35 @@ fn arg_ref_async_result(ty: hir::Ty) -> hir::TypedExpr {
     hir::Expr::arg_ref(1, ty)
 }
 
-fn func_ref_env_pop(cont_arg_ty: hir::Ty) -> hir::TypedExpr {
-    let fun_ty = hir::FunTy {
-        is_async: false,
-        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
-        ret_ty: Box::new(cont_arg_ty),
+fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr {
+    let env_pop = {
+        let fun_ty = hir::FunTy {
+            is_async: false,
+            param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
+            ret_ty: Box::new(popped_value_ty.clone()),
+        };
+        hir::Expr::func_ref("chiika_env_pop", fun_ty)
     };
-    hir::Expr::func_ref("chiika_env_pop", fun_ty)
+    let cast_type = match popped_value_ty {
+        hir::Ty::Int => hir::CastType::AnyToInt,
+        hir::Ty::Fun(_) => hir::CastType::AnyToFun,
+        _ => panic!("[BUG] cannot cast: {:?}", popped_value_ty),
+    };
+    hir::Expr::cast(
+        hir::Expr::fun_call(
+            env_pop,
+            vec![arg_ref_env(), hir::Expr::number(n_pop as i64)],
+            popped_value_ty.clone(),
+        ),
+        cast_type,
+        popped_value_ty,
+    )
 }
 
 fn func_ref_env_push() -> hir::TypedExpr {
     let fun_ty = hir::FunTy {
         is_async: false,
-        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Opaque],
+        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any],
         ret_ty: Box::new(hir::Ty::Int),
     };
     hir::Expr::func_ref("chiika_env_push", fun_ty)

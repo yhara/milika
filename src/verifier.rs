@@ -59,8 +59,18 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
         hir::Expr::Return(e) => {
             assert(&e.1, &f.ret_ty)?;
         }
-        hir::Expr::Cast(_, e) => {
-            verify_expr(f, e)?;
+        hir::Expr::Cast(cast_type, val) => {
+            verify_expr(f, val)?;
+            match cast_type {
+                hir::CastType::AnyToFun => {
+                    assert(&val.1, &hir::Ty::Any)?;
+                    assert_fun(&e.1)?;
+                }
+                hir::CastType::AnyToInt => {
+                    assert(&val.1, &hir::Ty::Any)?;
+                    assert(&e.1, &hir::Ty::Int)?;
+                }
+            }
         }
         hir::Expr::Para(es) => {
             verify_exprs(f, es)?;
@@ -79,6 +89,13 @@ fn verify_exprs(f: &hir::Function, es: &[hir::TypedExpr]) -> Result<()> {
 fn assert(ty: &hir::Ty, expected: &hir::Ty) -> Result<()> {
     if ty != expected {
         bail!("expected {:?}, but got {:?}", expected, ty);
+    }
+    Ok(())
+}
+
+fn assert_fun(ty: &hir::Ty) -> Result<()> {
+    if !matches!(ty, hir::Ty::Fun(_)) {
+        bail!("expected Ty::Fun, but got {:?}", ty);
     }
     Ok(())
 }

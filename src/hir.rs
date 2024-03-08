@@ -94,7 +94,7 @@ impl Param {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
     Void,
-    Opaque, // Its type is unknown to Milika
+    Any, // Corresponds to `ptr` in llvm
     ChiikaEnv,
     RustFuture,
     Int,
@@ -109,7 +109,7 @@ impl TryFrom<ast::Ty> for Ty {
         let t = match x {
             ast::Ty::Raw(s) => match &s[..] {
                 "void" => Ty::Void,
-                "ANY" => Ty::Opaque,
+                "ANY" => Ty::Any,
                 "ENV" => Ty::ChiikaEnv,
                 "FUTURE" => Ty::RustFuture,
                 "CONT" => Ty::chiika_cont(),
@@ -127,7 +127,7 @@ impl Ty {
     pub fn chiika_cont() -> Ty {
         Ty::Fun(FunTy {
             is_async: false,
-            param_tys: vec![Ty::ChiikaEnv, Ty::Opaque],
+            param_tys: vec![Ty::ChiikaEnv, Ty::Any],
             ret_ty: Box::new(Ty::RustFuture),
         })
     }
@@ -198,8 +198,8 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CastType {
-    IntToBool,
-    BoolToInt,
+    AnyToFun,
+    AnyToInt,
 }
 
 impl Expr {
@@ -229,5 +229,9 @@ impl Expr {
 
     pub fn return_(e: TypedExpr) -> TypedExpr {
         (Expr::Return(Box::new(e)), Ty::Void)
+    }
+
+    pub fn cast(e: TypedExpr, cast_type: CastType, ty: Ty) -> TypedExpr {
+        (Expr::Cast(cast_type, Box::new(e)), ty)
     }
 }
