@@ -200,6 +200,8 @@ pub enum Expr {
 pub enum CastType {
     AnyToFun,
     AnyToInt,
+    IntToAny,
+    FunToAny,
 }
 
 impl Expr {

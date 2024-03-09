@@ -254,10 +254,7 @@ fn prepend_async_intro(
         );
 
     let mut push_calls = push_items
-        .map(|arg| {
-            //let cast = hir::Expr::Cast(Box::new(arg), hir::Ty::Opaque);
-            hir::Expr::fun_call(func_ref_env_push(), vec![arg_ref_env(), arg], hir::Ty::Int)
-        })
+        .map(|arg| call_chiika_env_push(arg))
         .collect::<Vec<_>>();
     push_calls.append(&mut stmts);
     push_calls
@@ -340,13 +337,25 @@ fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr
     )
 }
 
-fn func_ref_env_push() -> hir::TypedExpr {
+fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
+    let cast_val = {
+        let cast_type = match val.1 {
+            hir::Ty::Int => hir::CastType::IntToAny,
+            hir::Ty::Fun(_) => hir::CastType::FunToAny,
+            _ => panic!("[BUG] cannot cast: {:?}", val.1),
+        };
+        hir::Expr::cast(val, cast_type, hir::Ty::Any)
+    };
     let fun_ty = hir::FunTy {
         is_async: false,
         param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any],
         ret_ty: Box::new(hir::Ty::Int),
     };
-    hir::Expr::func_ref("chiika_env_push", fun_ty)
+    hir::Expr::fun_call(
+        hir::Expr::func_ref("chiika_env_push", fun_ty),
+        vec![arg_ref_env(), cast_val],
+        hir::Ty::Int,
+    )
 }
 
 fn func_ref_env_ref() -> hir::TypedExpr {

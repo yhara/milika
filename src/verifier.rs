@@ -70,6 +70,14 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
                     assert(&val.1, &hir::Ty::Any)?;
                     assert(&e.1, &hir::Ty::Int)?;
                 }
+                hir::CastType::IntToAny => {
+                    assert(&val.1, &hir::Ty::Int)?;
+                    assert(&e.1, &hir::Ty::Any)?;
+                }
+                hir::CastType::FunToAny => {
+                    assert_fun(&val.1)?;
+                    assert(&e.1, &hir::Ty::Any)?;
+                }
             }
         }
         hir::Expr::Para(es) => {

@@ -3,6 +3,7 @@ use anyhow::{anyhow, Result};
 use melior::{
     dialect::{
         self,
+        ods,
         //ods::r#async,
         DialectRegistry,
     },
@@ -188,8 +189,12 @@ impl<'c> Compiler<'c> {
                 self.compile_assign(func_block, block, lvars, name, rhs)
             }
             hir::Expr::Return(val_expr) => self.compile_return(func_block, block, lvars, val_expr),
-            //ast::Expr::Para(exprs) => self.compile_para(func_block, block, lvars, exprs),
-            _ => todo!("{:?}", texpr),
+            hir::Expr::Cast(expr, cast_type) => {
+                self.compile_cast(func_block, block, lvars, expr, cast_type)
+            }
+            hir::Expr::Para(_exprs) => todo!(),
+            //self.compile_para(func_block, block, lvars, exprs),
+            //_ => todo!("{:?}", texpr),
         }
     }
 
@@ -385,6 +390,40 @@ impl<'c> Compiler<'c> {
         let op = dialect::func::r#return(&[v], self.unknown_loc());
         block.append_operation(op);
         Ok(None)
+    }
+
+    fn compile_cast<'a>(
+        &self,
+        func_block: &'a ir::Block<'c>,
+        block: &'a ir::Block<'c>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
+        cast_type: &hir::CastType,
+        expr: &hir::TypedExpr,
+    ) -> Result<Option<ir::Value<'c, 'a>>> {
+        let e = self.compile_value_expr(func_block, block, lvars, expr)?;
+        let v = match cast_type {
+            hir::CastType::AnyToFun => e,
+            hir::CastType::AnyToInt => {
+                let op = ods::llvm::ptrtoint(
+                    self.context,
+                    self.int_type().into(),
+                    e,
+                    self.unknown_loc(),
+                );
+                val(block.append_operation(op.into()))
+            }
+            hir::CastType::IntToAny => {
+                let op = ods::llvm::inttoptr(
+                    self.context,
+                    self.int_type().into(),
+                    e,
+                    self.unknown_loc(),
+                );
+                val(block.append_operation(op.into()))
+            }
+            hir::CastType::FunToAny => e,
+        };
+        Ok(Some(v))
     }
 
     fn compile_lvarref<'a>(
