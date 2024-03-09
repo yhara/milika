@@ -330,7 +330,7 @@ fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr
         hir::Expr::fun_call(
             env_pop,
             vec![arg_ref_env(), hir::Expr::number(n_pop as i64)],
-            popped_value_ty.clone(),
+            hir::Ty::Any,
         ),
         cast_type,
         popped_value_ty,
