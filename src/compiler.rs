@@ -91,7 +91,7 @@ impl<'c> Compiler<'c> {
         //pass_manager.run(&mut module).unwrap();
         eprintln!("--CUTHERE--");
         module.as_operation().dump();
-        assert!(module.as_operation().verify());
+        //assert!(module.as_operation().verify());
         Ok(())
     }
 

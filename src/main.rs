@@ -28,6 +28,7 @@ fn main() -> Result<()> {
 
     verifier::run(&hir)?;
 
+    println!("{hir}");
     compiler::run(path, &src, hir)?;
     Ok(())
 }

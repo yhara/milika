@@ -1,10 +1,23 @@
 use crate::ast;
 use anyhow::{anyhow, Result};
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct Program {
     pub externs: Vec<Extern>,
     pub funcs: Vec<Function>,
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for e in &self.externs {
+            write!(f, "{}", e)?;
+        }
+        for func in &self.funcs {
+            write!(f, "{}", func)?;
+        }
+        write!(f, "")
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,12 +60,46 @@ impl Extern {
     }
 }
 
+impl fmt::Display for Extern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let asyn = if self.is_async { "(async)" } else { "" };
+        let inte = if self.is_internal { "(internal)" } else { "" };
+        let para = self
+            .params
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(
+            f,
+            "extern{}{} {}({}) -> {};\n",
+            asyn, inte, self.name, para, self.ret_ty
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
     pub body_stmts: Vec<Typed<Expr>>,
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let para = self
+            .params
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "fun {}({}) -> {} {{\n", self.name, para, self.ret_ty)?;
+        for expr in &self.body_stmts {
+            write!(f, "  {};  #-> {}\n", &expr.0, &expr.1)?;
+        }
+        write!(f, "}}\n")
+    }
 }
 
 impl Function {
@@ -91,6 +138,12 @@ impl Param {
     }
 }
 
+impl fmt::Display for Param {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.ty, self.name)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
     Void,
@@ -100,6 +153,15 @@ pub enum Ty {
     Int,
     Bool,
     Fun(FunTy),
+}
+
+impl fmt::Display for Ty {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Ty::Fun(fun_ty) => write!(f, "{}", fun_ty),
+            _ => write!(f, "{:?}", self),
+        }
+    }
 }
 
 impl TryFrom<ast::Ty> for Ty {
@@ -138,6 +200,18 @@ pub struct FunTy {
     pub is_async: bool,
     pub param_tys: Vec<Ty>,
     pub ret_ty: Box<Ty>,
+}
+
+impl fmt::Display for FunTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let para = self
+            .param_tys
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "FN(({})->{})", para, &self.ret_ty)
+    }
 }
 
 impl From<FunTy> for Ty {
@@ -202,6 +276,55 @@ pub enum CastType {
     AnyToInt,
     IntToAny,
     FunToAny,
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Number(n) => write!(f, "{}", n),
+            Expr::LVarRef(name) => write!(f, "{}", name),
+            Expr::ArgRef(idx) => write!(f, "%arg_{}", idx),
+            Expr::FuncRef(name) => write!(f, "{}", name),
+            Expr::OpCall(op, lhs, rhs) => write!(f, "({} {} {})", lhs.0, op, rhs.0),
+            Expr::FunCall(func, args) => {
+                write!(f, "{}(", func.0)?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", arg.0)?;
+                }
+                write!(f, ")")
+            }
+            Expr::If(cond, then, else_) => {
+                write!(f, "if({}){{\n", cond.0)?;
+                for stmt in then {
+                    write!(f, "  {}\n", stmt.0)?;
+                }
+                write!(f, "}}")?;
+                if let Some(else_) = else_ {
+                    write!(f, " else {{\n")?;
+                    for stmt in else_ {
+                        write!(f, "  {}\n", stmt.0)?;
+                    }
+                    write!(f, "}}")?;
+                }
+                Ok(())
+            }
+            Expr::While(cond, body) => {
+                write!(f, "while {} {{\n", cond.0)?;
+                for stmt in body {
+                    write!(f, "  {}\n", stmt.0)?;
+                }
+                write!(f, "}}")
+            }
+            Expr::Alloc(name) => write!(f, "alloc {}", name),
+            Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
+            Expr::Return(e) => write!(f, "return {}", e.0),
+            Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
+            Expr::Para(_exprs) => todo!(),
+        }
+    }
 }
 
 impl Expr {
