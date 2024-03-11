@@ -264,13 +264,14 @@ impl<'c> Compiler<'c> {
 
         let f = self.compile_value_expr(func_block, block, lvars, fexpr)?;
 
-        let mut args = vec![];
+        let mut args = vec![f];
         for e in arg_exprs {
             args.push(self.compile_value_expr(func_block, block, lvars, e)?.into());
         }
 
-        let result_types = vec![self.mlir_type(&fun_ty.ret_ty)?];
-        let op = dialect::func::call_indirect(f, &args, &result_types, self.unknown_loc());
+        let result_type = self.mlir_type(&fun_ty.ret_ty)?;
+        let op = dialect::llvm::call(&args, result_type, self.unknown_loc());
+        //        let op = dialect::func::call_indirect(f, &args, &result_types, self.unknown_loc());
         Ok(Some(val(block.append_operation(op))))
     }
 
@@ -517,7 +518,7 @@ impl<'c> Compiler<'c> {
     fn const_int(&self, n: i64) -> ir::Operation<'c> {
         dialect::arith::constant(
             &self.context,
-            IntegerAttribute::new(n, self.int_type().into()).into(),
+            IntegerAttribute::new(self.int_type().into(), n).into(),
             self.unknown_loc(),
         )
     }
