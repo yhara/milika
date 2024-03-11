@@ -261,18 +261,40 @@ impl<'c> Compiler<'c> {
         let hir::Ty::Fun(fun_ty) = &fexpr.1 else {
             return Err(anyhow!("[BUG] not a function: {:?}", fexpr.1));
         };
+        if matches!(fexpr.0, hir::Expr::FuncRef(_)) {
+            let f = self.compile_value_expr(func_block, block, lvars, fexpr)?;
 
-        let f = self.compile_value_expr(func_block, block, lvars, fexpr)?;
+            let mut args = vec![];
+            for e in arg_exprs {
+                args.push(self.compile_value_expr(func_block, block, lvars, e)?.into());
+            }
 
-        let mut args = vec![f];
-        for e in arg_exprs {
-            args.push(self.compile_value_expr(func_block, block, lvars, e)?.into());
+            let result_types = vec![self.mlir_type(&fun_ty.ret_ty)?];
+            let op = dialect::func::call_indirect(f, &args, &result_types, self.unknown_loc());
+            Ok(Some(val(block.append_operation(op))))
+        } else {
+            dbg!(&fexpr);
+            let f = self.compile_value_expr(func_block, block, lvars, fexpr)?;
+
+            let mut args = vec![f];
+            for e in arg_exprs {
+                args.push(self.compile_value_expr(func_block, block, lvars, e)?.into());
+            }
+
+            let result_type = self.mlir_type(&fun_ty.ret_ty)?;
+            let op = dialect::llvm::call(&args, result_type, self.unknown_loc());
+            Ok(Some(val(block.append_operation(op))))
         }
-
-        let result_type = self.mlir_type(&fun_ty.ret_ty)?;
-        let op = dialect::llvm::call(&args, result_type, self.unknown_loc());
+        //||||||| constructed merge base
+        //        let result_types = vec![self.mlir_type(&fun_ty.ret_ty)?];
         //        let op = dialect::func::call_indirect(f, &args, &result_types, self.unknown_loc());
-        Ok(Some(val(block.append_operation(op))))
+        //        Ok(Some(val(block.append_operation(op))))
+        //=======
+        //        let result_types = vec![self.mlir_type(&fun_ty.ret_ty)?];
+        //        let op = dialect::func::call_indirect(f, &args, &result_types, self.unknown_loc());
+        //        let op = ods::llvm::call(self.context, self.unknown_loc());
+        //        Ok(Some(val(block.append_operation(op.into()))))
+        //>>>>>>> Stashed changes
     }
 
     fn compile_if<'a>(
@@ -403,26 +425,26 @@ impl<'c> Compiler<'c> {
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         let e = self.compile_value_expr(func_block, block, lvars, expr)?;
         let v = match cast_type {
-            hir::CastType::AnyToFun => e,
             hir::CastType::AnyToInt => {
-                let op = ods::llvm::ptrtoint(
-                    self.context,
-                    self.int_type().into(),
-                    e,
-                    self.unknown_loc(),
-                );
+                let op = ods::llvm::ptrtoint(self.context, self.int_type(), e, self.unknown_loc());
                 val(block.append_operation(op.into()))
             }
             hir::CastType::IntToAny => {
-                let op = ods::llvm::inttoptr(
-                    self.context,
-                    self.int_type().into(),
-                    e,
-                    self.unknown_loc(),
-                );
+                let op = ods::llvm::inttoptr(self.context, self.int_type(), e, self.unknown_loc());
                 val(block.append_operation(op.into()))
             }
-            hir::CastType::FunToAny => e,
+            hir::CastType::AnyToFun => {
+                let op = ods::llvm::bitcast(self.context, self.ptr_type(), e, self.unknown_loc());
+                val(block.append_operation(op.into()))
+            }
+            hir::CastType::FunToAny => {
+                //let t = MemRefType::new(self.int_type().into(), &[], None, None);
+                //let op = dialect::memref::cast(e, t, self.unknown_loc());
+                //                let op =
+                //                    ods::llvm::mlir_addressof(self.context, self.ptr_type(), e, self.unknown_loc());
+                //val(block.append_operation(op.into()))
+                e
+            }
         };
         Ok(Some(v))
     }
@@ -526,7 +548,7 @@ impl<'c> Compiler<'c> {
     fn function_type(&self, fun_ty: &hir::FunTy) -> Result<ir::r#type::FunctionType<'c>> {
         let param_tys = self.mlir_types(&fun_ty.param_tys)?;
         let ret_ty = self.mlir_type(&fun_ty.ret_ty)?;
-        Ok(FunctionType::new(&self.context, &param_tys, &[ret_ty]).into())
+        Ok(FunctionType::new(&self.context, &param_tys, &[ret_ty]))
     }
 
     fn mlir_types(&self, tys: &[hir::Ty]) -> Result<Vec<ir::Type<'c>>> {
@@ -536,14 +558,16 @@ impl<'c> Compiler<'c> {
     fn mlir_type(&self, ty: &hir::Ty) -> Result<ir::Type<'c>> {
         let t = match ty {
             hir::Ty::Void => return Err(anyhow!("[BUG] void is unexpected")),
-            hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => {
-                Type::parse(&self.context, "!llvm.ptr").unwrap()
-            }
+            hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => self.ptr_type(),
             hir::Ty::Int => self.int_type().into(),
             hir::Ty::Bool => Type::parse(&self.context, "i1").unwrap(),
-            hir::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
+            hir::Ty::Fun(fun_ty) => self.ptr_type(),
         };
         Ok(t)
+    }
+
+    fn ptr_type(&self) -> ir::Type<'c> {
+        Type::parse(&self.context, "!llvm.ptr").unwrap()
     }
 
     fn int_type(&self) -> ir::Type<'c> {
