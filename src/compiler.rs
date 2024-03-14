@@ -517,7 +517,7 @@ impl<'c> Compiler<'c> {
     fn const_int(&self, n: i64) -> ir::Operation<'c> {
         dialect::arith::constant(
             &self.context,
-            IntegerAttribute::new(n, self.int_type().into()).into(),
+            IntegerAttribute::new(self.int_type().into(), n).into(),
             self.unknown_loc(),
         )
     }
