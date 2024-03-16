@@ -27,7 +27,24 @@ impl Chapter {
 }
 
 /// Splits asynchronous Milika func into multiple funcs.
+/// Also, signatures of async externs are modified to take `$env` and `$cont` as the first two params.
 pub fn run(hir: hir::Program) -> Result<hir::Program> {
+    let externs = hir
+        .externs
+        .into_iter()
+        .map(|e| {
+            if e.is_async {
+                hir::Extern {
+                    params: prepend_async_params(&e.params, e.ret_ty.clone()),
+                    ret_ty: hir::Ty::RustFuture,
+                    ..e
+                }
+            } else {
+                e
+            }
+        })
+        .collect();
+
     let mut c = AsyncSplitter {
         chapters: Default::default(),
     };
@@ -36,7 +53,7 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
         let mut split_funcs = c.compile_func(f)?;
         funcs.append(&mut split_funcs);
     }
-    Ok(hir::Program { funcs, ..hir })
+    Ok(hir::Program { externs, funcs })
 }
 
 impl AsyncSplitter {
@@ -212,7 +229,7 @@ impl AsyncSplitter {
         last_chapter
             .stmts
             .push(hir::Expr::return_(hir::Expr::fun_call(
-                fexpr,
+                (fexpr.0, async_fun_ty(fun_ty).into()),
                 new_args,
                 hir::Ty::RustFuture,
             )));
@@ -223,13 +240,31 @@ impl AsyncSplitter {
     }
 }
 
+fn async_fun_ty(orig_fun_ty: &hir::FunTy) -> hir::FunTy {
+    let mut param_tys = orig_fun_ty.param_tys.clone();
+    param_tys.insert(0, hir::Ty::ChiikaEnv);
+    param_tys.insert(
+        1,
+        hir::Ty::Fun(hir::FunTy {
+            is_async: false,
+            param_tys: vec![hir::Ty::ChiikaEnv, *orig_fun_ty.ret_ty.clone()],
+            ret_ty: Box::new(hir::Ty::RustFuture),
+        }),
+    );
+    hir::FunTy {
+        is_async: true,
+        param_tys,
+        ret_ty: Box::new(hir::Ty::RustFuture),
+    }
+}
+
 /// Prepend params for async (`$env` and `$cont`)
 fn prepend_async_params(params: &[hir::Param], result_ty: hir::Ty) -> Vec<hir::Param> {
     let mut new_params = params.to_vec();
     new_params.insert(0, hir::Param::new(hir::Ty::ChiikaEnv, "$env"));
 
     let fun_ty = hir::FunTy {
-        is_async: false, // chiika-1 does not have notion of asyncness
+        is_async: false,
         param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
         ret_ty: Box::new(hir::Ty::RustFuture),
     };
