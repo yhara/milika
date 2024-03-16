@@ -421,7 +421,15 @@ impl<'c> Compiler<'c> {
                 );
                 val(block.append_operation(op.into()))
             }
-            hir::CastType::FunToAny => e,
+            hir::CastType::FunToAny => {
+                let op = ods::builtin::unrealized_conversion_cast(
+                    self.context,
+                    &[self.ptr_type().into()],
+                    &[e],
+                    self.unknown_loc(),
+                );
+                val(block.append_operation(op.into()))
+            }
         };
         Ok(Some(v))
     }
@@ -535,14 +543,16 @@ impl<'c> Compiler<'c> {
     fn mlir_type(&self, ty: &hir::Ty) -> Result<ir::Type<'c>> {
         let t = match ty {
             hir::Ty::Void => return Err(anyhow!("[BUG] void is unexpected")),
-            hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => {
-                Type::parse(&self.context, "!llvm.ptr").unwrap()
-            }
+            hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => self.ptr_type().into(),
             hir::Ty::Int => self.int_type().into(),
             hir::Ty::Bool => Type::parse(&self.context, "i1").unwrap(),
             hir::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
         Ok(t)
+    }
+
+    fn ptr_type(&self) -> ir::Type<'c> {
+        Type::parse(&self.context, "!llvm.ptr").unwrap()
     }
 
     fn int_type(&self) -> ir::Type<'c> {
