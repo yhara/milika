@@ -57,6 +57,7 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
             verify_expr(f, v)?;
         }
         hir::Expr::Return(e) => {
+            verify_expr(f, e)?;
             assert(&e.1, &f.ret_ty)?;
         }
         hir::Expr::Cast(cast_type, val) => {
