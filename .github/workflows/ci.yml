@@ -58,7 +58,7 @@ jobs:
       - name: Build and test
         run: |
           set -eux
-          rake integratoin_test
+          rake integration_test
 
   # Run cargo fmt --all -- --check
   format:
