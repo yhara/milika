@@ -63,9 +63,9 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
         hir::Expr::Cast(cast_type, val) => {
             verify_expr(f, val)?;
             match cast_type {
-                hir::CastType::AnyToFun => {
+                hir::CastType::AnyToFun(fun_ty) => {
                     assert(&val.1, &hir::Ty::Any)?;
-                    assert_fun(&e.1)?;
+                    assert(&e.1, &fun_ty.clone().into())?;
                 }
                 hir::CastType::AnyToInt => {
                     assert(&val.1, &hir::Ty::Any)?;

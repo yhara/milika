@@ -272,7 +272,7 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CastType {
-    AnyToFun,
+    AnyToFun(FunTy),
     AnyToInt,
     IntToAny,
     FunToAny,

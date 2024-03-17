@@ -402,7 +402,15 @@ impl<'c> Compiler<'c> {
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         let e = self.compile_value_expr(func_block, block, lvars, expr)?;
         let v = match cast_type {
-            hir::CastType::AnyToFun => e,
+            hir::CastType::AnyToFun(fun_ty) => {
+                let op = ods::builtin::unrealized_conversion_cast(
+                    self.context,
+                    &[self.function_type(fun_ty)?.into()],
+                    &[e],
+                    self.unknown_loc(),
+                );
+                val(block.append_operation(op.into()))
+            }
             hir::CastType::AnyToInt => {
                 let op = ods::llvm::ptrtoint(
                     self.context,

@@ -352,13 +352,13 @@ fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr
         let fun_ty = hir::FunTy {
             is_async: false,
             param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
-            ret_ty: Box::new(popped_value_ty.clone()),
+            ret_ty: Box::new(hir::Ty::Any),
         };
         hir::Expr::func_ref("chiika_env_pop", fun_ty)
     };
-    let cast_type = match popped_value_ty {
+    let cast_type = match &popped_value_ty {
         hir::Ty::Int => hir::CastType::AnyToInt,
-        hir::Ty::Fun(_) => hir::CastType::AnyToFun,
+        hir::Ty::Fun(fun_ty) => hir::CastType::AnyToFun(fun_ty.clone()),
         _ => panic!("[BUG] cannot cast: {:?}", popped_value_ty),
     };
     hir::Expr::cast(
