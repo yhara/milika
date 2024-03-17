@@ -88,3 +88,12 @@ task :tmp do
   #sh "mlir-translate#{SUFFIX} --mlir-to-llvmir b.mlir > b.ll"
   lowering("b")
 end
+
+task :integration_test do
+  Dir["examples/*.milika"].each do |path|
+    name = path.sub(".milika", "")
+    sh "NAME=#{name} rake run > #{name}.actual_out"
+    sh "diff #{name}.actual_out #{name}.expected_out"
+    raise "Found diff" unless $?.success?
+  end
+end
