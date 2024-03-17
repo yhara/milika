@@ -32,7 +32,6 @@ end
 
 file "#{NAME}.mlir" => ["#{NAME}.milika", *SRC] do
   sh "cargo fmt"
-  sh "#{PREFIX} cargo run -- #{NAME}.milika"
   sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1" do |ok, status|
     unless ok
       sh "cat #{NAME}.tmp"
