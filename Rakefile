@@ -1,9 +1,9 @@
-NAME = "a"
-CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./target"
+NAME = ENV["NAME"] || "a"
+CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./chiika_runtime/target"
 RUNTIME = Dir["chiika_runtime/**/*"]
 RUNTIME_A = File.expand_path "#{CARGO_TARGET}/debug/libchiika_runtime.a"
 PREFIX, SUFFIX =
-  if RUBY_PLATFORM =~ /linux/
+  if File.exist?("/usr/lib/llvm-17")
     ["MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17", "-17"]
   else
     ["", ""]
@@ -24,7 +24,7 @@ def lowering(name)
 end
 
 file RUNTIME_A => [*RUNTIME] do
-  cd "chiika_runtime" do
+  Dir.chdir "chiika_runtime" do
     sh "cargo fmt"
     sh "cargo build"
   end
@@ -32,7 +32,12 @@ end
 
 file "#{NAME}.mlir" => ["#{NAME}.milika", *SRC] do
   sh "cargo fmt"
-  sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1"
+  sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1" do |ok, status|
+    unless ok
+      sh "cat #{NAME}.tmp"
+      raise "cargo run failed"
+    end
+  end
   s = File.read("#{NAME}.tmp")
   File.write("#{NAME}.mlir", s[/--CUTHERE--(.*)/m, 1])
 end
@@ -87,4 +92,12 @@ task :tmp do
   #sh %{mlir-opt#{SUFFIX} mlir-opt-async.mlir -pass-pipeline="builtin.module(async-to-async-runtime,func.func(async-runtime-ref-counting,async-runtime-ref-counting-opt),convert-async-to-llvm,func.func(convert-linalg-to-loops,convert-scf-to-cf),finalize-memref-to-llvm,func.func(convert-arith-to-llvm),convert-func-to-llvm,reconcile-unrealized-casts)" > b.mlir }
   #sh "mlir-translate#{SUFFIX} --mlir-to-llvmir b.mlir > b.ll"
   lowering("b")
+end
+
+task :integration_test do
+  Dir["examples/*.milika"].each do |path|
+    name = path.sub(".milika", "")
+    sh "NAME=#{name} rake run > #{name}.actual_out"
+    sh "diff #{name}.actual_out #{name}.expected_out"
+  end
 end

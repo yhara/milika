@@ -1,0 +1,81 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  # Run unit tests
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-13]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up the Linux env
+        if: runner.os == 'Linux'
+        run: |
+          set -eux
+          sudo apt install -y libgc-dev
+
+      - name: Cache LLVM and Clang on Linux
+        id: cache-llvm
+        if: runner.os == 'Linux'
+        uses: actions/cache@v3
+        with:
+          path: |
+            C:/Program Files/LLVM
+            ./llvm
+          key: llvm-17.0
+      - name: Install LLVM and Clang on Linux
+        if: runner.os == 'Linux'
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "17.0"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+      - name: Set up LLVM and Clang on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@17
+          echo "/usr/local/opt/llvm@17/bin" >> $GITHUB_PATH
+
+      - name: Output versions
+        run: |
+          set -eux
+          rustc --version
+          cargo --version
+          clang --version
+
+      - name: Build and test
+        run: |
+          set -eux
+          rake integration_test
+
+  # Run cargo fmt --all -- --check
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: rustfmt
+          override: true
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check

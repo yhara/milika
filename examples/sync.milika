@@ -1,0 +1,5 @@
+extern print(int n) -> int;
+fun chiika_main() -> int {
+  print(123);
+  return 0;
+}
