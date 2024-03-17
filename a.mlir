@@ -1,6 +1,6 @@
 
 module {
-  func.func private @putchar(i64) -> i64
+  func.func private @print(i64) -> i64
   func.func private @sleep_sec(!llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr, i64) -> !llvm.ptr
   func.func private @chiika_env_push(!llvm.ptr, !llvm.ptr) -> i64
   func.func private @chiika_env_pop(!llvm.ptr, i64) -> !llvm.ptr
@@ -10,9 +10,9 @@ module {
     %f = constant @chiika_env_push : (!llvm.ptr, !llvm.ptr) -> i64
     %0 = builtin.unrealized_conversion_cast %arg1 : (!llvm.ptr, i64) -> !llvm.ptr to !llvm.ptr
     %1 = call_indirect %f(%arg0, %0) : (!llvm.ptr, !llvm.ptr) -> i64
-    %f_0 = constant @putchar : (i64) -> i64
-    %c70_i64 = arith.constant 70 : i64
-    %2 = call_indirect %f_0(%c70_i64) : (i64) -> i64
+    %f_0 = constant @print : (i64) -> i64
+    %c123_i64 = arith.constant 123 : i64
+    %2 = call_indirect %f_0(%c123_i64) : (i64) -> i64
     %f_1 = constant @sleep_sec : (!llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr, i64) -> !llvm.ptr
     %f_2 = constant @chiika_main_1 : (!llvm.ptr, i64) -> !llvm.ptr
     %c1_i64 = arith.constant 1 : i64
@@ -20,9 +20,9 @@ module {
     return %3 : !llvm.ptr
   }
   func.func @chiika_main_1(%arg0: !llvm.ptr, %arg1: i64) -> !llvm.ptr {
-    %f = constant @putchar : (i64) -> i64
-    %c72_i64 = arith.constant 72 : i64
-    %0 = call_indirect %f(%c72_i64) : (i64) -> i64
+    %f = constant @print : (i64) -> i64
+    %c456_i64 = arith.constant 456 : i64
+    %0 = call_indirect %f(%c456_i64) : (i64) -> i64
     %f_0 = constant @chiika_env_pop : (!llvm.ptr, i64) -> !llvm.ptr
     %c1_i64 = arith.constant 1 : i64
     %1 = call_indirect %f_0(%arg0, %c1_i64) : (!llvm.ptr, i64) -> !llvm.ptr

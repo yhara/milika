@@ -5,7 +5,7 @@ declare ptr @malloc(i64)
 
 declare void @free(ptr)
 
-declare i64 @putchar(i64)
+declare i64 @print(i64)
 
 declare ptr @sleep_sec(ptr, ptr, i64)
 
@@ -19,13 +19,13 @@ declare i64 @chiika_start_tokio(i64)
 
 define ptr @chiika_main(ptr %0, ptr %1) {
   %3 = call i64 @chiika_env_push(ptr %0, ptr %1)
-  %4 = call i64 @putchar(i64 70)
+  %4 = call i64 @print(i64 123)
   %5 = call ptr @sleep_sec(ptr %0, ptr @chiika_main_1, i64 1)
   ret ptr %5
 }
 
 define ptr @chiika_main_1(ptr %0, i64 %1) {
-  %3 = call i64 @putchar(i64 72)
+  %3 = call i64 @print(i64 456)
   %4 = call ptr @chiika_env_pop(ptr %0, i64 1)
   %5 = call ptr %4(ptr %0, i64 0)
   ret ptr %5
