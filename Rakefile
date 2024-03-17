@@ -10,6 +10,19 @@ PREFIX, SUFFIX =
   end
 SRC = Dir["src/**/*"]
 
+def lowering(name)
+  sh "mlir-opt#{SUFFIX} \
+    --async-func-to-async-runtime \
+    --async-to-async-runtime \
+    --convert-async-to-llvm \
+    --convert-arith-to-llvm \
+    --convert-scf-to-cf \
+    --convert-func-to-llvm \
+    --finalize-memref-to-llvm \
+    --reconcile-unrealized-casts \
+    < #{name}.mlir > #{name}2.mlir"
+end
+
 file RUNTIME_A => [*RUNTIME] do
   cd "chiika_runtime" do
     sh "cargo fmt"
@@ -25,15 +38,7 @@ file "#{NAME}.mlir" => ["#{NAME}.milika", *SRC] do
 end
 
 file "#{NAME}2.mlir" => ["#{NAME}.mlir"] do
-  sh "mlir-opt#{SUFFIX} \
-    --async-func-to-async-runtime \
-    --async-to-async-runtime \
-    --convert-async-to-llvm \
-    --convert-arith-to-llvm \
-    --convert-scf-to-cf \
-    --convert-func-to-llvm \
-    --finalize-memref-to-llvm \
-    < #{NAME}.mlir > #{NAME}2.mlir"
+  lowering(NAME)
 end
 
 file "#{NAME}.ll" => ["#{NAME}2.mlir"] do
@@ -79,6 +84,7 @@ task :cpp do
 end
 
 task :tmp do
-  sh %{mlir-opt#{SUFFIX} mlir-opt-async.mlir -pass-pipeline="builtin.module(async-to-async-runtime,func.func(async-runtime-ref-counting,async-runtime-ref-counting-opt),convert-async-to-llvm,func.func(convert-linalg-to-loops,convert-scf-to-cf),finalize-memref-to-llvm,func.func(convert-arith-to-llvm),convert-func-to-llvm,reconcile-unrealized-casts)" > b.mlir }
-  sh "mlir-translate#{SUFFIX} --mlir-to-llvmir b.mlir > b.ll"
+  #sh %{mlir-opt#{SUFFIX} mlir-opt-async.mlir -pass-pipeline="builtin.module(async-to-async-runtime,func.func(async-runtime-ref-counting,async-runtime-ref-counting-opt),convert-async-to-llvm,func.func(convert-linalg-to-loops,convert-scf-to-cf),finalize-memref-to-llvm,func.func(convert-arith-to-llvm),convert-func-to-llvm,reconcile-unrealized-casts)" > b.mlir }
+  #sh "mlir-translate#{SUFFIX} --mlir-to-llvmir b.mlir > b.ll"
+  lowering("b")
 end

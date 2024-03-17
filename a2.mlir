@@ -6,18 +6,16 @@ module attributes {llvm.data_layout = ""} {
   llvm.func @chiika_env_ref(!llvm.ptr, i64) -> i64 attributes {sym_visibility = "private"}
   llvm.func @chiika_start_tokio(i64) -> i64 attributes {sym_visibility = "private"}
   llvm.func @chiika_main(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
-    %0 = builtin.unrealized_conversion_cast %arg1 : !llvm.ptr to (!llvm.ptr, i64) -> !llvm.ptr
-    %1 = llvm.mlir.addressof @chiika_env_push : !llvm.ptr
-    %2 = builtin.unrealized_conversion_cast %0 : (!llvm.ptr, i64) -> !llvm.ptr to !llvm.ptr
-    %3 = llvm.call %1(%arg0, %2) : !llvm.ptr, (!llvm.ptr, !llvm.ptr) -> i64
-    %4 = llvm.mlir.addressof @putchar : !llvm.ptr
-    %5 = llvm.mlir.constant(70 : i64) : i64
-    %6 = llvm.call %4(%5) : !llvm.ptr, (i64) -> i64
-    %7 = llvm.mlir.addressof @sleep_sec : !llvm.ptr
-    %8 = llvm.mlir.addressof @chiika_main_1 : !llvm.ptr
-    %9 = llvm.mlir.constant(1 : i64) : i64
-    %10 = llvm.call %7(%arg0, %8, %9) : !llvm.ptr, (!llvm.ptr, !llvm.ptr, i64) -> !llvm.ptr
-    llvm.return %10 : !llvm.ptr
+    %0 = llvm.mlir.addressof @chiika_env_push : !llvm.ptr
+    %1 = llvm.call %0(%arg0, %arg1) : !llvm.ptr, (!llvm.ptr, !llvm.ptr) -> i64
+    %2 = llvm.mlir.addressof @putchar : !llvm.ptr
+    %3 = llvm.mlir.constant(70 : i64) : i64
+    %4 = llvm.call %2(%3) : !llvm.ptr, (i64) -> i64
+    %5 = llvm.mlir.addressof @sleep_sec : !llvm.ptr
+    %6 = llvm.mlir.addressof @chiika_main_1 : !llvm.ptr
+    %7 = llvm.mlir.constant(1 : i64) : i64
+    %8 = llvm.call %5(%arg0, %6, %7) : !llvm.ptr, (!llvm.ptr, !llvm.ptr, i64) -> !llvm.ptr
+    llvm.return %8 : !llvm.ptr
   }
   llvm.func @chiika_main_1(%arg0: !llvm.ptr, %arg1: i64) -> !llvm.ptr {
     %0 = llvm.mlir.addressof @putchar : !llvm.ptr
@@ -26,10 +24,9 @@ module attributes {llvm.data_layout = ""} {
     %3 = llvm.mlir.addressof @chiika_env_pop : !llvm.ptr
     %4 = llvm.mlir.constant(1 : i64) : i64
     %5 = llvm.call %3(%arg0, %4) : !llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr
-    %6 = builtin.unrealized_conversion_cast %5 : !llvm.ptr to (!llvm.ptr, i64) -> !llvm.ptr
-    %7 = llvm.mlir.constant(0 : i64) : i64
-    %8 = llvm.call %5(%arg0, %7) : !llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr
-    llvm.return %8 : !llvm.ptr
+    %6 = llvm.mlir.constant(0 : i64) : i64
+    %7 = llvm.call %5(%arg0, %6) : !llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr
+    llvm.return %7 : !llvm.ptr
   }
   llvm.func @chiika_start_user(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
     %0 = llvm.mlir.addressof @chiika_main : !llvm.ptr
