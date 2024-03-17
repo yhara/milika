@@ -313,11 +313,11 @@ fn append_async_outro(
         let n_pop = orig_func.params.len() + 1; // +1 for $cont
         call_chiika_env_pop(n_pop, cont_ty)
     };
-    stmts.push(hir::Expr::fun_call(
+    stmts.push(hir::Expr::return_(hir::Expr::fun_call(
         cont,
         vec![arg_ref_env(), *ret_val],
         hir::Ty::RustFuture,
-    ));
+    )));
     stmts
 }
 
