@@ -1,4 +1,4 @@
-NAME = "a"
+NAME = ENV["NAME"] || "a"
 CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./target"
 RUNTIME = Dir["chiika_runtime/**/*"]
 RUNTIME_A = File.expand_path "#{CARGO_TARGET}/debug/libchiika_runtime.a"

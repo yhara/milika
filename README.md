@@ -15,6 +15,18 @@ MLIR experiment
 - `apt install libmlir-17-dev libpolly-17-dev libzstd-dev`
 - `MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17 cargo run`
 
+## How to run
+
+Currently you need Ruby and Rake (`gem install rake`) to run a milika program.
+
+Example:
+
+```sh
+$ NAME="examples/sync" rake run
+...
+123
+```
+
 ## Language
 
 See a.milika or src/ast.rs.
