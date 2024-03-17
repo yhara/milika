@@ -24,7 +24,7 @@ def lowering(name)
 end
 
 file RUNTIME_A => [*RUNTIME] do
-  cd "chiika_runtime" do
+  Dir.chdir "chiika_runtime" do
     sh "cargo fmt"
     sh "cargo build"
   end
