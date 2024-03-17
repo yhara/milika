@@ -32,7 +32,12 @@ end
 
 file "#{NAME}.mlir" => ["#{NAME}.milika", *SRC] do
   sh "cargo fmt"
-  sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1"
+  sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1" do |ok, status|
+    unless ok
+      sh "cat #{NAME}.tmp"
+      raise "cargo run failed"
+    end
+  end
   s = File.read("#{NAME}.tmp")
   File.write("#{NAME}.mlir", s[/--CUTHERE--(.*)/m, 1])
 end
@@ -94,6 +99,5 @@ task :integration_test do
     name = path.sub(".milika", "")
     sh "NAME=#{name} rake run > #{name}.actual_out"
     sh "diff #{name}.actual_out #{name}.expected_out"
-    raise "Found diff" unless $?.success?
   end
 end
