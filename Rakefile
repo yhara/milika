@@ -1,9 +1,9 @@
 NAME = ENV["NAME"] || "a"
-CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./target"
+CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./chiika_runtime/target"
 RUNTIME = Dir["chiika_runtime/**/*"]
 RUNTIME_A = File.expand_path "#{CARGO_TARGET}/debug/libchiika_runtime.a"
 PREFIX, SUFFIX =
-  if false #RUBY_PLATFORM =~ /linux/
+  if File.exist?("/usr/lib/llvm-17")
     ["MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17", "-17"]
   else
     ["", ""]
