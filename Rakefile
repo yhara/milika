@@ -3,7 +3,7 @@ CARGO_TARGET = ENV["SHIIKA_CARGO_TARGET"] || "./target"
 RUNTIME = Dir["chiika_runtime/**/*"]
 RUNTIME_A = File.expand_path "#{CARGO_TARGET}/debug/libchiika_runtime.a"
 PREFIX, SUFFIX =
-  if RUBY_PLATFORM =~ /linux/
+  if false #RUBY_PLATFORM =~ /linux/
     ["MLIR_SYS_170_PREFIX=/usr/lib/llvm-17 TABLEGEN_170_PREFIX=/usr/lib/llvm-17", "-17"]
   else
     ["", ""]
@@ -32,6 +32,7 @@ end
 
 file "#{NAME}.mlir" => ["#{NAME}.milika", *SRC] do
   sh "cargo fmt"
+  sh "#{PREFIX} cargo run -- #{NAME}.milika"
   sh "#{PREFIX} cargo run -- #{NAME}.milika > #{NAME}.tmp 2>&1" do |ok, status|
     unless ok
       sh "cat #{NAME}.tmp"
