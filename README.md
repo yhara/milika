@@ -29,11 +29,37 @@ $ NAME="examples/sync" rake run
 
 ## Language
 
-See a.milika or src/ast.rs.
+See examples/\*.milika or src/ast.rs.
 
 - Asyncness
   - Async Rust function must be imported with `extern(async)`.
   - A Milika function is considered async when it contains a call of an async (Milika or Rust) function.
+- main function
+  - The entry point of a Milika program must be named `chiika_main` (for now).
+- Syntax
+  - Each statement must end with `;`.
+- Expressions
+  - Integers (1, 2, 3, ...)
+  - Variable declaration
+    - `alloc x;`
+    - Only integers are supported now
+    - Compiled into llvm's alloca
+  - Variable assignment
+    - `x = 1;`
+  - If
+    - `if (x) { ... } else { ... }`
+  - While
+    - `while (x) { ... }`
+  - Return
+    - `return x;`
+- Types
+  - `int`
+  - `bool`
+  - `void`
+  - Internally used in src/prelude.rs:
+    - `ENV` (chiika_runtime/src/chiika_env.rs)
+    - `ANY` (llvm ptr)
+    - `FN((x,y)->z)` (function type)
 
 ## TODO
 
