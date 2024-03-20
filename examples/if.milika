@@ -1,0 +1,9 @@
+extern print(Int n) -> Null;
+fun chiika_main() -> Null {
+  if (true) {
+    print(456);
+  } else {
+    print(789);
+  };
+  return null;
+}
