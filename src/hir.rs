@@ -361,6 +361,10 @@ impl Expr {
         (Expr::FunCall(Box::new(func), args), result_ty)
     }
 
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
+        (Expr::If(Box::new(cond), then, else_), Ty::Void)
+    }
+
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
         (Expr::Assign(name.into(), Box::new(e)), Ty::Void)
     }
