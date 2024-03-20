@@ -53,9 +53,10 @@ See examples/\*.milika or src/ast.rs.
   - Return
     - `return x;`
 - Types
-  - `int`
-  - `bool`
-  - `void`
+  - `Int`
+  - `Bool`
+  - `Null`
+    - A type that can only have one value, `null`.
   - Internally used in src/prelude.rs:
     - `ENV` (chiika_runtime/src/chiika_env.rs)
     - `ANY` (llvm ptr)

@@ -172,12 +172,13 @@ impl TryFrom<ast::Ty> for Ty {
         let t = match x {
             ast::Ty::Raw(s) => match &s[..] {
                 "Null" => Ty::Null,
+                "Int" => Ty::Int,
+                "Bool" => Ty::Bool,
+                // Internally used types (in src/prelude.rs)
                 "ANY" => Ty::Any,
                 "ENV" => Ty::ChiikaEnv,
                 "FUTURE" => Ty::RustFuture,
                 "CONT" => Ty::chiika_cont(),
-                "int" => Ty::Int,
-                "bool" => Ty::Bool,
                 _ => return Err(anyhow!("unknown type: {s}")),
             },
             ast::Ty::Fun(f) => Ty::Fun(f.try_into()?),

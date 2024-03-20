@@ -1,5 +1,5 @@
-extern print(int n) -> Null;
-extern(async) sleep_sec(int n) -> Null;
+extern print(Int n) -> Null;
+extern(async) sleep_sec(Int n) -> Null;
 
 #fun main() -> int {
 #  alloc a;
