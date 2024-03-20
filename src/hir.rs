@@ -146,8 +146,9 @@ impl fmt::Display for Param {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
-    Void,
-    Any, // Corresponds to `ptr` in llvm
+    Null, // A unit type. Represented by `i64 0`
+    Void, // eg. the type of `return` or assignment. There is no value of this type.
+    Any,  // Corresponds to `ptr` in llvm
     ChiikaEnv,
     RustFuture,
     Int,
@@ -170,13 +171,14 @@ impl TryFrom<ast::Ty> for Ty {
     fn try_from(x: ast::Ty) -> Result<Self> {
         let t = match x {
             ast::Ty::Raw(s) => match &s[..] {
-                "void" => Ty::Void,
+                "Null" => Ty::Null,
+                "Int" => Ty::Int,
+                "Bool" => Ty::Bool,
+                // Internally used types (in src/prelude.rs)
                 "ANY" => Ty::Any,
                 "ENV" => Ty::ChiikaEnv,
                 "FUTURE" => Ty::RustFuture,
                 "CONT" => Ty::chiika_cont(),
-                "int" => Ty::Int,
-                "bool" => Ty::Bool,
                 _ => return Err(anyhow!("unknown type: {s}")),
             },
             ast::Ty::Fun(f) => Ty::Fun(f.try_into()?),
@@ -256,6 +258,7 @@ pub type TypedExpr = Typed<Expr>;
 #[derive(Debug, Clone)]
 pub enum Expr {
     Number(i64),
+    PseudoVar(PseudoVar),
     LVarRef(String),
     ArgRef(usize),
     FuncRef(String),
@@ -271,6 +274,13 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PseudoVar {
+    True,
+    False,
+    Null,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CastType {
     AnyToFun(FunTy),
     AnyToInt,
@@ -282,6 +292,9 @@ impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expr::Number(n) => write!(f, "{}", n),
+            Expr::PseudoVar(PseudoVar::True) => write!(f, "true"),
+            Expr::PseudoVar(PseudoVar::False) => write!(f, "false"),
+            Expr::PseudoVar(PseudoVar::Null) => write!(f, "null"),
             Expr::LVarRef(name) => write!(f, "{}", name),
             Expr::ArgRef(idx) => write!(f, "%arg_{}", idx),
             Expr::FuncRef(name) => write!(f, "{}", name),

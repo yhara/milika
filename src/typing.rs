@@ -65,6 +65,12 @@ impl Typing {
                     (hir::Expr::ArgRef(i), ty)
                 } else if let Some(ty) = lvars.get(name) {
                     (hir::Expr::LVarRef(name.to_string()), ty.clone())
+                } else if name == "true" {
+                    (hir::Expr::PseudoVar(hir::PseudoVar::True), hir::Ty::Bool)
+                } else if name == "false" {
+                    (hir::Expr::PseudoVar(hir::PseudoVar::False), hir::Ty::Bool)
+                } else if name == "null" {
+                    (hir::Expr::PseudoVar(hir::PseudoVar::Null), hir::Ty::Null)
                 } else {
                     return Err(anyhow!("unknown variable `{name}'"));
                 }

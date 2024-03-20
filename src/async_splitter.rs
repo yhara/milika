@@ -145,6 +145,7 @@ impl AsyncSplitter {
     ) -> Result<hir::TypedExpr> {
         let new_e = match e.0 {
             hir::Expr::Number(_) => e,
+            hir::Expr::PseudoVar(_) => e,
             hir::Expr::LVarRef(_) => {
                 if self.chapters.len() == 1 {
                     // The variable is just there in the first chapter
@@ -190,11 +191,16 @@ impl AsyncSplitter {
             hir::Expr::Assign(name, rhs) => {
                 hir::Expr::assign(name, self.compile_expr(orig_func, *rhs)?)
             }
-            //hir::Expr::While(cond_expr, body_exprs) => todo!(),
-            //hir::Expr::If(cond_expr, then_exprs, else_exprs) => todo!(),
+            hir::Expr::While(_cond_expr, _body_exprs) => todo!(),
+            hir::Expr::If(_cond_expr, _then_exprs, _else_exprs) => todo!(),
             hir::Expr::Alloc(_) => e,
             hir::Expr::Return(expr) => hir::Expr::return_(self.compile_expr(orig_func, *expr)?),
-            _ => todo!("{:?}", e),
+            hir::Expr::Cast(_, _) => {
+                return Err(anyhow!(
+                    "[BUG] cast should not appear before async_splitter"
+                ))
+            }
+            hir::Expr::Para(_) => todo!(),
         };
         Ok(new_e)
     }
