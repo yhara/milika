@@ -282,7 +282,7 @@ impl<'c> Compiler<'c> {
         lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
         cond_expr: &hir::TypedExpr,
         then: &[hir::TypedExpr],
-        els: &Option<Vec<hir::TypedExpr>>,
+        els: &[hir::TypedExpr],
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         let cond_result = self.compile_value_expr(func_block, block, lvars, cond_expr)?;
         let then_region = {
@@ -292,12 +292,7 @@ impl<'c> Compiler<'c> {
         };
         let else_region = {
             let region = ir::Region::new();
-            region.append_block(self.compile_exprs(
-                func_block,
-                lvars,
-                if let Some(v) = els { v } else { &[] },
-                true,
-            )?);
+            region.append_block(self.compile_exprs(func_block, lvars, els, true)?);
             region
         };
         let op = dialect::scf::r#if(

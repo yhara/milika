@@ -46,9 +46,7 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
         hir::Expr::If(cond, then, els) => {
             verify_expr(f, cond)?;
             verify_exprs(f, then)?;
-            if let Some(el) = els {
-                verify_exprs(f, el)?;
-            }
+            verify_exprs(f, els)?;
         }
         hir::Expr::While(cond, body) => {
             verify_expr(f, cond)?;
