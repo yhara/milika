@@ -1,6 +1,7 @@
 use crate::hir;
 use anyhow::{bail, Context, Result};
 
+/// Check type consistency of the HIR to detect bugs in the compiler.
 pub fn run(hir: &hir::Program) -> Result<()> {
     for f in &hir.funcs {
         for e in &f.body_stmts {
@@ -20,6 +21,7 @@ fn verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
 fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
     match &e.0 {
         hir::Expr::Number(_) => assert(&e.1, &hir::Ty::Int)?,
+        hir::Expr::PseudoVar(_) => (),
         hir::Expr::LVarRef(_) => (),
         hir::Expr::ArgRef(_) => (),
         hir::Expr::FuncRef(_) => (),

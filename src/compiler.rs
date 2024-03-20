@@ -164,6 +164,7 @@ impl<'c> Compiler<'c> {
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         match &texpr.0 {
             hir::Expr::Number(n) => self.compile_number(block, *n),
+            hir::Expr::PseudoVar(pvar) => self.compile_pseudo_var(block, pvar),
             hir::Expr::LVarRef(name) => self.compile_lvarref(block, lvars, name),
             hir::Expr::ArgRef(idx) => self.compile_argref(func_block, idx),
             hir::Expr::FuncRef(name) => {
@@ -486,6 +487,32 @@ impl<'c> Compiler<'c> {
         Ok(Some(val(block.append_operation(self.const_int(n)))))
     }
 
+    fn compile_pseudo_var<'a>(
+        &self,
+        block: &'a ir::Block<'c>,
+        pseudo_var: &hir::PseudoVar,
+    ) -> Result<Option<ir::Value<'c, 'a>>> {
+        let op = match pseudo_var {
+            hir::PseudoVar::True => dialect::arith::constant(
+                &self.context,
+                IntegerAttribute::new(self.bool_type().into(), 1).into(),
+                self.unknown_loc(),
+            ),
+            hir::PseudoVar::False => dialect::arith::constant(
+                &self.context,
+                IntegerAttribute::new(self.bool_type().into(), 0).into(),
+                self.unknown_loc(),
+            ),
+            // Null is represented as `i64 0`
+            hir::PseudoVar::Null => dialect::arith::constant(
+                &self.context,
+                IntegerAttribute::new(self.int_type().into(), 0).into(),
+                self.unknown_loc(),
+            ),
+        };
+        Ok(Some(val(block.append_operation(op))))
+    }
+
     /// Returns a newly created region that contains `exprs`.
     fn compile_exprs<'a>(
         &self,
@@ -550,9 +577,9 @@ impl<'c> Compiler<'c> {
 
     fn mlir_type(&self, ty: &hir::Ty) -> Result<ir::Type<'c>> {
         let t = match ty {
-            hir::Ty::Void => return Err(anyhow!("[BUG] void is unexpected")),
+            hir::Ty::Void => return Err(anyhow!("void is unexpected here")),
             hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => self.ptr_type().into(),
-            hir::Ty::Int => self.int_type().into(),
+            hir::Ty::Int | hir::Ty::Null => self.int_type().into(),
             hir::Ty::Bool => Type::parse(&self.context, "i1").unwrap(),
             hir::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
@@ -561,6 +588,10 @@ impl<'c> Compiler<'c> {
 
     fn ptr_type(&self) -> ir::Type<'c> {
         Type::parse(&self.context, "!llvm.ptr").unwrap()
+    }
+
+    fn bool_type(&self) -> ir::Type<'c> {
+        ir::r#type::IntegerType::new(&self.context, 1).into()
     }
 
     fn int_type(&self) -> ir::Type<'c> {
