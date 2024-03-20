@@ -13,7 +13,7 @@ pub fn prelude_funcs(main_is_async: bool) -> String {
     String::new()
         + main_sig
         + "
-        extern chiika_env_push(ENV env, ANY obj) -> int;
+        extern chiika_env_push(ENV env, ANY obj) -> Null;
         extern chiika_env_pop(ENV env, int n) -> ANY;
         extern chiika_env_ref(ENV env, int n) -> int;
         extern chiika_start_tokio(int n) -> int;
