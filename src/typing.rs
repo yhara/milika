@@ -117,9 +117,9 @@ impl Typing {
                 }
                 let then = self.compile_exprs(orig_func, lvars, then_exprs)?;
                 let els = if let Some(es) = opt_else_exprs {
-                    Some(self.compile_exprs(orig_func, lvars, es)?)
+                    self.compile_exprs(orig_func, lvars, es)?
                 } else {
-                    None
+                    vec![]
                 };
                 let ty = hir::Ty::Void;
                 (hir::Expr::If(Box::new(cond), then, els), ty)

@@ -264,7 +264,7 @@ pub enum Expr {
     FuncRef(String),
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
-    If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Option<Vec<Typed<Expr>>>),
+    If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
@@ -315,7 +315,7 @@ impl std::fmt::Display for Expr {
                     write!(f, "  {}\n", stmt.0)?;
                 }
                 write!(f, "}}")?;
-                if let Some(else_) = else_ {
+                if !else_.is_empty() {
                     write!(f, " else {{\n")?;
                     for stmt in else_ {
                         write!(f, "  {}\n", stmt.0)?;
@@ -359,6 +359,10 @@ impl Expr {
 
     pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>, result_ty: Ty) -> TypedExpr {
         (Expr::FunCall(Box::new(func), args), result_ty)
+    }
+
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
+        (Expr::If(Box::new(cond), then, else_), Ty::Void)
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {

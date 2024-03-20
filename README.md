@@ -67,6 +67,8 @@ See examples/\*.milika or src/ast.rs.
 - Support `return x` from async Milika func
   - Must be replaced with like `$cont($env, x); return;`
 - Support `if` in async Milika func
+- Support `if` with value 
+- Support async call in if condition
 - Support `while` in async Milika func
 
 Refactor
