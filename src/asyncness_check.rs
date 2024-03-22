@@ -13,10 +13,10 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::Fu
     // 1st pass
     for decl in decls {
         match decl {
-            ast::Declaration::Extern((x, _span)) => {
+            ast::Declaration::Extern(x) => {
                 sigs.insert(x.name.clone(), hir::Extern::from_ast(x)?.fun_ty());
             }
-            ast::Declaration::Function((x, _span)) => {
+            ast::Declaration::Function(x) => {
                 funcs.insert(x.name.clone(), x);
                 queue.push(x.name.clone());
             }
@@ -46,7 +46,7 @@ fn gather_sig(
     sigs: &HashMap<String, hir::FunTy>,
 ) -> Result<Either<FuncName, hir::FunTy>> {
     let mut is_async = false;
-    for (stmt, _) in &func.body_stmts {
+    for stmt in &func.body_stmts {
         match check_async(&func.name, &stmt, sigs)? {
             Either::Left(x) => return Ok(Either::Left(x)),
             Either::Right(b) => is_async = is_async || b,
@@ -62,7 +62,7 @@ fn check_async(
 ) -> Result<Either<FuncName, bool>> {
     match expr {
         ast::Expr::FunCall(fexpr, arg_exprs) => {
-            let (ast::Expr::VarRef(ref fname), _) = **fexpr else {
+            let ast::Expr::VarRef(ref fname) = **fexpr else {
                 return Err(anyhow!("not a function: {:?}", fexpr));
             };
             if let Some(fun_ty) = sigs.get(fname) {
@@ -70,7 +70,7 @@ fn check_async(
                     Ok(Either::Right(true))
                 } else {
                     let mut is_async = false;
-                    for (e, _) in arg_exprs {
+                    for e in arg_exprs {
                         match check_async(func_name, e, sigs)? {
                             Either::Left(x) => return Ok(Either::Left(x)),
                             Either::Right(b) => is_async = is_async || b,

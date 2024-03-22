@@ -9,6 +9,7 @@ edition = "2021"
 #melior = { features = ["ods-dialects"], path = "../melior/melior"}
 melior = {version = "0.17.0", features = ["ods-dialects"]}
 nom = "7.1.3"
+peg = "0.8.2"
 ariadne = "0.3.0"
 anyhow = "1.0"
 either = "1.9.0"

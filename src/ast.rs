@@ -1,13 +1,9 @@
-use nom_locate;
-pub type Span<'a> = nom_locate::LocatedSpan<&'a str>;
-pub type Spanned<'a, T> = (T, Span<'a>);
-
-pub type Program<'a> = Spanned<'a, Vec<Declaration<'a>>>;
+pub type Program<'a> = Vec<Declaration>;
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Declaration<'a> {
-    Extern(Spanned<'a, Extern>),
-    Function(Spanned<'a, Function<'a>>),
+pub enum Declaration {
+    Extern(Extern),
+    Function(Function),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -22,11 +18,11 @@ pub struct Extern {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct Function<'a> {
+pub struct Function {
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
-    pub body_stmts: Vec<SpannedExpr<'a>>,
+    pub body_stmts: Vec<Expr>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -47,22 +43,15 @@ pub struct FunTy {
     pub ret_ty: Box<Ty>,
 }
 
-pub type SpannedExpr<'a> = Spanned<'a, Expr<'a>>;
-
 #[derive(PartialEq, Debug, Clone)]
-pub enum Expr<'a> {
+pub enum Expr {
     Number(i64),
     VarRef(String),
-    OpCall(String, Box<SpannedExpr<'a>>, Box<SpannedExpr<'a>>),
-    FunCall(Box<SpannedExpr<'a>>, Vec<SpannedExpr<'a>>),
-    If(
-        Box<SpannedExpr<'a>>,
-        Vec<SpannedExpr<'a>>,
-        Option<Vec<SpannedExpr<'a>>>,
-    ),
-    While(Box<SpannedExpr<'a>>, Vec<SpannedExpr<'a>>),
+    OpCall(String, Box<Expr>, Box<Expr>),
+    FunCall(Box<Expr>, Vec<Expr>),
+    If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>),
+    While(Box<Expr>, Vec<Expr>),
     Alloc(String),
-    Assign(String, Box<SpannedExpr<'a>>),
-    Return(Box<SpannedExpr<'a>>),
-    Para(Vec<SpannedExpr<'a>>),
+    Assign(String, Box<Expr>),
+    Return(Box<Expr>),
 }
