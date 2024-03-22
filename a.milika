@@ -1,5 +1,5 @@
-extern print(Int n) -> Null;
-extern(async) sleep_sec(Int n) -> Null;
+extern print(Int n) -> Null
+extern(async) sleep_sec(Int n) -> Null
 
 #fun main() -> int {
 #  alloc a;
@@ -13,9 +13,9 @@ extern(async) sleep_sec(Int n) -> Null;
 
 fun chiika_main() -> Null {
   if (true) {
-    print(456);
+    print(456)
   } else {
-    print(789);
-  };
-  return null;
+    print(789)
+  }
+  return null
 }

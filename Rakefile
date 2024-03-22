@@ -91,7 +91,8 @@ end
 task :tmp do
   #sh %{mlir-opt#{SUFFIX} mlir-opt-async.mlir -pass-pipeline="builtin.module(async-to-async-runtime,func.func(async-runtime-ref-counting,async-runtime-ref-counting-opt),convert-async-to-llvm,func.func(convert-linalg-to-loops,convert-scf-to-cf),finalize-memref-to-llvm,func.func(convert-arith-to-llvm),convert-func-to-llvm,reconcile-unrealized-casts)" > b.mlir }
   #sh "mlir-translate#{SUFFIX} --mlir-to-llvmir b.mlir > b.ll"
-  lowering("b")
+  #lowering("b")
+  sh "#{PREFIX} cargo run --example parser2"
 end
 
 task :integration_test do

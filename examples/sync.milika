@@ -1,5 +1,5 @@
-extern print(Int n) -> Null;
+extern print(Int n) -> Null
 fun chiika_main() -> Null {
-  print(123);
-  return null;
+  print(123)
+  return null
 }
