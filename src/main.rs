@@ -1,8 +1,8 @@
 mod ast;
-mod async_splitter;
 mod asyncness_check;
 mod compiler;
 mod hir;
+mod hir_lowering;
 mod parser;
 mod prelude;
 mod typing;
@@ -49,7 +49,7 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
         }
     };
     let hir = typing::run(ast)?;
-    let hir = async_splitter::run(hir)?;
+    let hir = hir_lowering::async_splitter::run(hir)?;
     Ok(hir)
 }
 
