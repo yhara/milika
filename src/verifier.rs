@@ -42,7 +42,10 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
                 .param_tys
                 .iter()
                 .zip(args.iter())
-                .try_for_each(|(p, a)| assert(&a.1, p))?;
+                .enumerate()
+                .try_for_each(|(i, (p, a))| {
+                    assert(&a.1, p).context(format!("in argument {}", i))
+                })?;
         }
         hir::Expr::If(cond, then, els) => {
             verify_expr(f, cond)?;

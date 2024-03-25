@@ -106,7 +106,8 @@ impl Typing {
                     .map(|e| self.compile_expr(orig_func, lvars, &e))
                     .collect::<Result<Vec<_>>>()?;
                 check_funcall_arg_types(&fun_ty.param_tys, &args)
-                    .context(format!("Invalid call: fexpr: {:?}", fexpr))?;
+                    .context(format!("Invalid call: {:?}", e))
+                    .context(format!("In function `{:?}'", orig_func))?;
                 let ty = (*fun_ty.ret_ty).clone();
                 (hir::Expr::FunCall(Box::new(f), args), ty)
             }
