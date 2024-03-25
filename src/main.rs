@@ -49,6 +49,7 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
         }
     };
     let hir = typing::run(ast)?;
+    let hir = hir_lowering::lower_async_if::run(hir)?;
     let hir = hir_lowering::async_splitter::run(hir)?;
     Ok(hir)
 }

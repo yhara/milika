@@ -1,3 +1,4 @@
+pub mod visitor;
 use crate::ast;
 use anyhow::{anyhow, Result};
 use std::fmt;
@@ -345,6 +346,19 @@ impl Expr {
         (Expr::Number(n), Ty::Int)
     }
 
+    pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
+        let t = if pv == PseudoVar::Null {
+            Ty::Null
+        } else {
+            Ty::Bool
+        };
+        (Expr::PseudoVar(pv), t)
+    }
+
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
+    }
+
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
         (Expr::ArgRef(idx), ty)
     }
@@ -363,6 +377,10 @@ impl Expr {
 
     pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
         (Expr::If(Box::new(cond), then, else_), Ty::Void)
+    }
+
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> TypedExpr {
+        (Expr::While(Box::new(cond), body), Ty::Void)
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
