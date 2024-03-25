@@ -37,6 +37,7 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
             let hir::Ty::Fun(fun_ty) = &fexpr.1 else {
                 bail!("expected function, but got {:?}", fexpr.1);
             };
+            assert(&e.1, &fun_ty.ret_ty)?;
             fun_ty
                 .param_tys
                 .iter()
