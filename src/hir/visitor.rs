@@ -45,6 +45,18 @@ pub trait HirVisitor {
                     self.visit_expr(expr)?;
                 }
             }
+            hir::Expr::ValuedIf(cond_expr, then_exprs, else_exprs) => {
+                self.visit_expr(cond_expr)?;
+                for expr in then_exprs {
+                    self.visit_expr(expr)?;
+                }
+                for expr in else_exprs {
+                    self.visit_expr(expr)?;
+                }
+            }
+            hir::Expr::Yield(expr) => {
+                self.visit_expr(expr)?;
+            }
             hir::Expr::While(cond_expr, body_exprs) => {
                 self.visit_expr(cond_expr)?;
                 for expr in body_exprs {

@@ -123,6 +123,8 @@ impl<'a> LowerAsyncIf<'a> {
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
                 self.compile_if(*cond_expr, then_exprs, else_exprs)?
             }
+            hir::Expr::ValuedIf(_, _, _) => todo!(),
+            hir::Expr::Yield(_) => todo!(),
         };
         Ok(new_e)
     }
@@ -142,15 +144,19 @@ impl<'a> LowerAsyncIf<'a> {
         // Statements after `if` goes to an "endif" chapter
         let endif_chap = Chapter::new_suffixed(&func_name, "e"); // e for endif
 
-        let goto_then = self.goto_expr(&then_chap.name, chap_fun_ty.clone());
-        let goto_else = self.goto_expr(&else_chap.name, chap_fun_ty.clone());
-        let goto_endif = self.goto_expr(&endif_chap.name, chap_fun_ty);
+        let then_ret = hir::Expr::yield_(self.goto_call(&then_chap.name, chap_fun_ty.clone()));
+        let else_ret = hir::Expr::yield_(self.goto_call(&else_chap.name, chap_fun_ty.clone()));
+        let goto_endif = hir::Expr::return_(self.goto_call(&endif_chap.name, chap_fun_ty));
 
         self.compile_clause(&mut then_chap, then_exprs, goto_endif.clone())?;
         self.compile_clause(&mut else_chap, else_exprs, goto_endif)?;
 
-        let new_if_expr = hir::Expr::if_(new_cond_expr, vec![goto_then], vec![goto_else]);
-        self.chapters.add_stmt(new_if_expr);
+        let terminator = hir::Expr::return_(hir::Expr::valued_if(
+            new_cond_expr,
+            vec![then_ret],
+            vec![else_ret],
+        )?);
+        self.chapters.add_stmt(terminator);
         self.chapters.add(then_chap);
         self.chapters.add(else_chap);
         self.chapters.add(endif_chap);
@@ -172,7 +178,8 @@ impl<'a> LowerAsyncIf<'a> {
         Ok(())
     }
 
-    fn goto_expr(&self, chap_name: &str, chap_fun_ty: hir::FunTy) -> hir::TypedExpr {
+    /// Generate a call to the chapter function
+    fn goto_call(&self, chap_name: &str, chap_fun_ty: hir::FunTy) -> hir::TypedExpr {
         let mut args = self
             .orig_func
             .params
@@ -185,11 +192,11 @@ impl<'a> LowerAsyncIf<'a> {
                 .iter()
                 .map(|(name, ty)| hir::Expr::lvar_ref(name.clone(), ty.clone())),
         );
-        hir::Expr::return_(hir::Expr::fun_call(
+        hir::Expr::fun_call(
             hir::Expr::func_ref(chap_name, chap_fun_ty),
             args,
             self.orig_func.ret_ty.clone(),
-        ))
+        )
     }
 
     fn chapter_fun_ty(&mut self) -> hir::FunTy {

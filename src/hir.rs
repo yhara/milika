@@ -266,6 +266,8 @@ pub enum Expr {
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
+    ValuedIf(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
+    Yield(Box<Typed<Expr>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
@@ -307,24 +309,26 @@ impl std::fmt::Display for Expr {
                         write!(f, ", ")?;
                     }
                     write!(f, "{}", arg.0)?;
+                    //write!(f, "{}: {}", arg.0, arg.1)?;
                 }
                 write!(f, ")")
             }
-            Expr::If(cond, then, else_) => {
+            Expr::If(cond, then, else_) | Expr::ValuedIf(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
-                    write!(f, "  {}\n", stmt.0)?;
+                    write!(f, "    {}  #-> {}\n", stmt.0, stmt.1)?;
                 }
-                write!(f, "}}")?;
+                write!(f, "  }}")?;
                 if !else_.is_empty() {
                     write!(f, " else {{\n")?;
                     for stmt in else_ {
-                        write!(f, "  {}\n", stmt.0)?;
+                        write!(f, "    {}  #-> {}\n", stmt.0, stmt.1)?;
                     }
-                    write!(f, "}}")?;
+                    write!(f, "  }}")?;
                 }
                 Ok(())
             }
+            Expr::Yield(e) => write!(f, "yield {}", e.0),
             Expr::While(cond, body) => {
                 write!(f, "while {} {{\n", cond.0)?;
                 for stmt in body {
@@ -377,6 +381,36 @@ impl Expr {
 
     pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
         (Expr::If(Box::new(cond), then, else_), Ty::Void)
+    }
+
+    pub fn valued_if(
+        cond: TypedExpr,
+        then: Vec<TypedExpr>,
+        else_: Vec<TypedExpr>,
+    ) -> Result<TypedExpr> {
+        let t1 = if let Some((Expr::Yield(e), _)) = then.last() {
+            e.1.clone()
+        } else {
+            return Err(anyhow!("The last statement of then branch must be `yield`"));
+        };
+        let t2 = if let Some((Expr::Yield(e), _)) = else_.last() {
+            e.1.clone()
+        } else {
+            return Err(anyhow!("The last statement of else branch must be `yield`"));
+        };
+        if t1 != t2 {
+            return Err(anyhow!(
+                "The types of then and else branches must be the same ({} != {})",
+                t1,
+                t2
+            ));
+        }
+        Ok((Expr::ValuedIf(Box::new(cond), then, else_), t1))
+    }
+
+    pub fn yield_(e: TypedExpr) -> TypedExpr {
+        let t = e.1.clone();
+        (Expr::Yield(Box::new(e)), t)
     }
 
     pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> TypedExpr {

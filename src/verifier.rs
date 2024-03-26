@@ -13,7 +13,7 @@ pub fn run(hir: &hir::Program) -> Result<()> {
 
 fn verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
     _verify_expr(f, e)
-        .context(format!("in expr {:?}", e.0))
+        .context(format!("in expr {:?} whose type is {}", e.0, e.1))
         .context(format!("in function {:?}", f.name))
         .context(format!("[BUG] Type verifier failed"))
 }
@@ -51,6 +51,15 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
             verify_expr(f, cond)?;
             verify_exprs(f, then)?;
             verify_exprs(f, els)?;
+        }
+        hir::Expr::ValuedIf(cond, then, els) => {
+            verify_expr(f, cond)?;
+            verify_exprs(f, then)?;
+            verify_exprs(f, els)?;
+        }
+        hir::Expr::Yield(v) => {
+            verify_expr(f, v)?;
+            assert(&v.1, &e.1)?;
         }
         hir::Expr::While(cond, body) => {
             verify_expr(f, cond)?;

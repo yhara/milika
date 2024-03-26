@@ -12,7 +12,7 @@ use melior::{
         attribute::{FlatSymbolRefAttribute, IntegerAttribute, StringAttribute, TypeAttribute},
         r#type::{FunctionType, MemRefType, Type},
     },
-    //pass::{self, PassManager},
+    pass::{self, PassManager},
     utility::{register_all_dialects, register_all_llvm_translations},
 };
 use train_map::TrainMap;
@@ -59,7 +59,7 @@ pub fn run(_filename: &str, _src: &str, prog: hir::Program) -> Result<()> {
 
 impl<'c> Compiler<'c> {
     fn compile_program(&self, prog: hir::Program) -> Result<()> {
-        let module = ir::Module::new(self.unknown_loc());
+        let mut module = ir::Module::new(self.unknown_loc());
         let block = module.body();
 
         for e in prog.externs {
@@ -74,17 +74,15 @@ impl<'c> Compiler<'c> {
         //assert!(module.as_operation().verify());
 
         // Convert to LLVM Dialect
+        //module.as_operation().dump();
         //let pass_manager = PassManager::new(&self.context);
-        //pass_manager.add_pass(pass::r#async::create_async_func_to_async_runtime());
-        //pass_manager.add_pass(pass::r#async::create_async_to_async_runtime());
-        //pass_manager.add_pass(pass::conversion::create_async_to_llvm());
         //pass_manager.add_pass(pass::conversion::create_func_to_llvm());
-        //pass_manager
-        //    .nested_under("func.func")
-        //    .add_pass(pass::conversion::create_arith_to_llvm());
-        //pass_manager
-        //    .nested_under("func.func")
-        //    .add_pass(pass::conversion::create_index_to_llvm());
+        ////pass_manager
+        ////    .nested_under("func.func")
+        ////    .add_pass(pass::conversion::create_arith_to_llvm());
+        ////pass_manager
+        ////    .nested_under("func.func")
+        ////    .add_pass(pass::conversion::create_index_to_llvm());
         //pass_manager.add_pass(pass::conversion::create_scf_to_control_flow());
         //pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
         //pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
@@ -151,7 +149,7 @@ impl<'c> Compiler<'c> {
     ) -> Result<ir::Value<'c, 'a>> {
         match self.compile_expr(func_block, block, lvars, expr)? {
             Some(v) => Ok(v),
-            None => Err(anyhow!("this expression does not have value")),
+            None => Err(anyhow!("this expression does not have value: {:?}", expr)),
         }
     }
 
@@ -180,8 +178,12 @@ impl<'c> Compiler<'c> {
                 self.compile_funcall(func_block, block, lvars, fexpr, arg_exprs)
             }
             hir::Expr::If(cond, then, els) => {
-                self.compile_if(func_block, block, lvars, cond, then, els)
+                self.compile_if(func_block, block, lvars, cond, then, els, false)
             }
+            hir::Expr::ValuedIf(cond, then, els) => {
+                self.compile_if(func_block, block, lvars, cond, then, els, true)
+            }
+            hir::Expr::Yield(expr) => self.compile_yield(func_block, block, lvars, expr),
             hir::Expr::While(cond, exprs) => {
                 self.compile_while(func_block, block, lvars, cond, exprs)
             }
@@ -283,25 +285,48 @@ impl<'c> Compiler<'c> {
         cond_expr: &hir::TypedExpr,
         then: &[hir::TypedExpr],
         els: &[hir::TypedExpr],
+        valued: bool,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
+        let result_types = if valued {
+            vec![self.int_type().into()]
+        } else {
+            vec![]
+        };
         let cond_result = self.compile_value_expr(func_block, block, lvars, cond_expr)?;
         let then_region = {
             let region = ir::Region::new();
-            region.append_block(self.compile_exprs(func_block, lvars, then, true)?);
+            region.append_block(self.compile_exprs(func_block, lvars, then)?);
             region
         };
         let else_region = {
             let region = ir::Region::new();
-            region.append_block(self.compile_exprs(func_block, lvars, els, true)?);
+            region.append_block(self.compile_exprs(func_block, lvars, els)?);
             region
         };
         let op = dialect::scf::r#if(
             cond_result,
-            Default::default(),
+            &result_types,
             then_region,
             else_region,
             self.unknown_loc(),
         );
+        if valued {
+            Ok(Some(val(block.append_operation(op))))
+        } else {
+            block.append_operation(op);
+            Ok(None)
+        }
+    }
+
+    fn compile_yield<'a>(
+        &self,
+        func_block: &'a ir::Block<'c>,
+        block: &'a ir::Block<'c>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
+        expr: &hir::TypedExpr,
+    ) -> Result<Option<ir::Value<'c, 'a>>> {
+        let v = self.compile_value_expr(func_block, block, lvars, expr)?;
+        let op = dialect::scf::r#yield(&[v], self.unknown_loc());
         block.append_operation(op);
         Ok(None)
     }
@@ -325,7 +350,7 @@ impl<'c> Compiler<'c> {
         };
         let after_region = {
             let region = ir::Region::new();
-            let block = self.compile_exprs(func_block, lvars, exprs, true)?;
+            let block = self.compile_exprs(func_block, lvars, exprs)?;
             region.append_block(block);
             region
         };
@@ -514,16 +539,11 @@ impl<'c> Compiler<'c> {
         func_block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, '_>>,
         exprs: &[hir::TypedExpr],
-        terminate: bool,
     ) -> Result<ir::Block<'c>> {
         let block = ir::Block::new(&[]);
         let mut lvars = lvars.fork();
         for expr in exprs {
             self.compile_expr(func_block, &block, &mut lvars, expr)?;
-        }
-        if terminate {
-            let op = dialect::scf::r#yield(&[], self.unknown_loc());
-            block.append_operation(op);
         }
         Ok(block)
     }

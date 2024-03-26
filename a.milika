@@ -12,10 +12,12 @@ extern(async) sleep_sec(Int n) -> Null
 #}
 
 fun chiika_main() -> Null {
+  print(123)
   if (true) {
     print(456)
   } else {
     print(789)
   }
+  print(0)
   return null
 }
