@@ -103,7 +103,7 @@ impl<'a> LowerAsyncIf<'a> {
                     .into_iter()
                     .map(|expr| self.compile_expr(expr))
                     .collect::<Result<_>>()?,
-                self.orig_func.ret_ty.clone(),
+                e.1,
             ),
             hir::Expr::While(cond_expr, body_exprs) => hir::Expr::while_(
                 self.compile_expr(*cond_expr)?,
