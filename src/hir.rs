@@ -1,3 +1,4 @@
+pub mod visitor;
 use crate::ast;
 use anyhow::{anyhow, Result};
 use std::fmt;
@@ -22,7 +23,6 @@ impl fmt::Display for Program {
 
 #[derive(Debug, Clone)]
 pub struct Extern {
-    pub is_async: bool,
     pub is_internal: bool,
     pub name: String,
     pub params: Vec<Param>,
@@ -38,8 +38,8 @@ impl TryFrom<ast::Extern> for Extern {
 
 impl Extern {
     pub fn from_ast(x: &ast::Extern) -> Result<Self> {
+        let t = x.ret_ty.clone().try_into()?;
         Ok(Self {
-            is_async: x.is_async,
             is_internal: x.is_internal,
             name: x.name.clone(),
             params: x
@@ -47,13 +47,16 @@ impl Extern {
                 .iter()
                 .map(|x| x.clone().try_into())
                 .collect::<Result<_>>()?,
-            ret_ty: x.ret_ty.clone().try_into()?,
+            ret_ty: if x.is_async {
+                Ty::Async(Box::new(t))
+            } else {
+                t
+            },
         })
     }
 
     pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async: self.is_async,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -62,7 +65,6 @@ impl Extern {
 
 impl fmt::Display for Extern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let asyn = if self.is_async { "(async)" } else { "" };
         let inte = if self.is_internal { "(internal)" } else { "" };
         let para = self
             .params
@@ -72,8 +74,8 @@ impl fmt::Display for Extern {
             .join(", ");
         write!(
             f,
-            "extern{}{} {}({}) -> {};\n",
-            asyn, inte, self.name, para, self.ret_ty
+            "extern{} {}({}) -> {};\n",
+            inte, self.name, para, self.ret_ty
         )
     }
 }
@@ -103,9 +105,8 @@ impl fmt::Display for Function {
 }
 
 impl Function {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy {
+    pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -154,6 +155,7 @@ pub enum Ty {
     Int,
     Bool,
     Fun(FunTy),
+    Async(Box<Ty>),
 }
 
 impl fmt::Display for Ty {
@@ -190,16 +192,18 @@ impl TryFrom<ast::Ty> for Ty {
 impl Ty {
     pub fn chiika_cont() -> Ty {
         Ty::Fun(FunTy {
-            is_async: false,
             param_tys: vec![Ty::ChiikaEnv, Ty::Any],
             ret_ty: Box::new(Ty::RustFuture),
         })
+    }
+
+    pub fn is_async(&self) -> bool {
+        matches!(self, Ty::Async(_))
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunTy {
-    pub is_async: bool,
     pub param_tys: Vec<Ty>,
     pub ret_ty: Box<Ty>,
 }
@@ -240,15 +244,24 @@ impl TryFrom<ast::FunTy> for FunTy {
 
 impl FunTy {
     pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Result<Self> {
+        let orig_t = f.ret_ty.clone().try_into()?;
+        let t = if is_async {
+            Ty::Async(Box::new(orig_t))
+        } else {
+            orig_t
+        };
         Ok(Self {
-            is_async,
             param_tys: f
                 .params
                 .iter()
                 .map(|x| x.ty.clone().try_into())
                 .collect::<Result<_>>()?,
-            ret_ty: Box::new(f.ret_ty.clone().try_into()?),
+            ret_ty: Box::new(t),
         })
+    }
+
+    pub fn is_async(&self) -> bool {
+        self.ret_ty.is_async()
     }
 }
 
@@ -265,12 +278,13 @@ pub enum Expr {
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
+    ValuedIf(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
+    Yield(Box<Typed<Expr>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
-    Para(Vec<Typed<Expr>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -306,24 +320,26 @@ impl std::fmt::Display for Expr {
                         write!(f, ", ")?;
                     }
                     write!(f, "{}", arg.0)?;
+                    //write!(f, "{}: {}", arg.0, arg.1)?;
                 }
                 write!(f, ")")
             }
-            Expr::If(cond, then, else_) => {
+            Expr::If(cond, then, else_) | Expr::ValuedIf(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
-                    write!(f, "  {}\n", stmt.0)?;
+                    write!(f, "    {}  #-> {}\n", stmt.0, stmt.1)?;
                 }
-                write!(f, "}}")?;
+                write!(f, "  }}")?;
                 if !else_.is_empty() {
                     write!(f, " else {{\n")?;
                     for stmt in else_ {
-                        write!(f, "  {}\n", stmt.0)?;
+                        write!(f, "    {}  #-> {}\n", stmt.0, stmt.1)?;
                     }
-                    write!(f, "}}")?;
+                    write!(f, "  }}")?;
                 }
                 Ok(())
             }
+            Expr::Yield(e) => write!(f, "yield {}", e.0),
             Expr::While(cond, body) => {
                 write!(f, "while {} {{\n", cond.0)?;
                 for stmt in body {
@@ -335,7 +351,6 @@ impl std::fmt::Display for Expr {
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}", e.0),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
-            Expr::Para(_exprs) => todo!(),
         }
     }
 }
@@ -343,6 +358,19 @@ impl std::fmt::Display for Expr {
 impl Expr {
     pub fn number(n: i64) -> TypedExpr {
         (Expr::Number(n), Ty::Int)
+    }
+
+    pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
+        let t = if pv == PseudoVar::Null {
+            Ty::Null
+        } else {
+            Ty::Bool
+        };
+        (Expr::PseudoVar(pv), t)
+    }
+
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
     }
 
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
@@ -363,6 +391,40 @@ impl Expr {
 
     pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
         (Expr::If(Box::new(cond), then, else_), Ty::Void)
+    }
+
+    pub fn valued_if(
+        cond: TypedExpr,
+        then: Vec<TypedExpr>,
+        else_: Vec<TypedExpr>,
+    ) -> Result<TypedExpr> {
+        let t1 = if let Some((Expr::Yield(e), _)) = then.last() {
+            e.1.clone()
+        } else {
+            return Err(anyhow!("The last statement of then branch must be `yield`"));
+        };
+        let t2 = if let Some((Expr::Yield(e), _)) = else_.last() {
+            e.1.clone()
+        } else {
+            return Err(anyhow!("The last statement of else branch must be `yield`"));
+        };
+        if t1 != t2 {
+            return Err(anyhow!(
+                "The types of then and else branches must be the same ({} != {})",
+                t1,
+                t2
+            ));
+        }
+        Ok((Expr::ValuedIf(Box::new(cond), then, else_), t1))
+    }
+
+    pub fn yield_(e: TypedExpr) -> TypedExpr {
+        let t = e.1.clone();
+        (Expr::Yield(Box::new(e)), t)
+    }
+
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> TypedExpr {
+        (Expr::While(Box::new(cond), body), Ty::Void)
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {

@@ -78,19 +78,64 @@ Refactor
 
 ### Async + if
 
-(Not implemented yet)
-
 Before:
 
 ```
-fun foo() -> int {
-  if (true) {
+fun foo() -> Int {
+  print(0)
+  if (cond) {
     print(1)
-    sleep_sec(1)  # Cut point #1
+    print(read_byte())
     print(2)
   } else {
     print(3)
-    sleep_sec(1)  # Cut point #2
+    print(read_byte())
+    print(4)
+  }
+  # Cut point #3 (end of if)
+  print(5)
+  return 6
+}
+```
+
+```
+fun foo(Int a) -> Int {
+  alloc b
+  print(0)
+  if (cond) {
+    return foo_1(a, b)
+  } else {
+    return foo_2(a, b)
+  }
+}
+fun foo_1(Int a, Int b) -> Int {
+  print(1)
+  print(read_byte())
+  print(2)
+  return foo_3(a, b)
+}
+fun foo_2(Int a, Int b) -> Int {
+  print(3)
+  print(read_byte())
+  print(4)
+  return foo_3(a, b)
+}
+fun foo_3(Int a, Int b) -> Int {
+  print(5)
+  return 6
+}
+```
+
+```
+extern(async) fun read_byte() -> Int
+fun foo() -> Int {
+  if ('cond) {
+    print(1)
+    print(read_byte())  # Cut point #1
+    print(2)
+  } else {
+    print(3)
+    print(read_byte())  # Cut point #2
     print(4)
   }
   # Cut point #3 (end of if)
@@ -106,17 +151,19 @@ fun foo(ChiikaEnv $env, FN((ChiikaEnv,int)->RustFuture) $cont) -> RustFuture {
   chiika_env_push($env, $cont)
   if (true) {
     print(1)
-    return sleep_sec($env, foo_1, 1)
+    return read_byte($env, foo_1, 1)
   } else {
     print(3)
-    return sleep_sec($env, foo_2, 1)
+    return read_byte($env, foo_2, 1)
   }
 }
-fun foo_1(ChiikaEnv $env, Nil $async_result) -> RustFuture {
+fun foo_1(ChiikaEnv $env, Int $async_result) -> RustFuture {
+  print($async_result)
   print(2)
   return foo_3($env, Nil)
 }
-fun foo_2(ChiikaEnv $env, Nil $async_result) -> RustFuture {
+fun foo_2(ChiikaEnv $env, Int $async_result) -> RustFuture {
+  print($async_result)
   print(4)
   return foo_3($env, Nil)
 }

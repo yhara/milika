@@ -13,7 +13,7 @@ pub fn run(hir: &hir::Program) -> Result<()> {
 
 fn verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
     _verify_expr(f, e)
-        .context(format!("in expr {:?}", e.0))
+        .context(format!("in expr {:?} whose type is {}", e.0, e.1))
         .context(format!("in function {:?}", f.name))
         .context(format!("[BUG] Type verifier failed"))
 }
@@ -37,16 +37,29 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
             let hir::Ty::Fun(fun_ty) = &fexpr.1 else {
                 bail!("expected function, but got {:?}", fexpr.1);
             };
+            assert(&e.1, &fun_ty.ret_ty)?;
             fun_ty
                 .param_tys
                 .iter()
                 .zip(args.iter())
-                .try_for_each(|(p, a)| assert(&a.1, p))?;
+                .enumerate()
+                .try_for_each(|(i, (p, a))| {
+                    assert(&a.1, p).context(format!("in argument {}", i))
+                })?;
         }
         hir::Expr::If(cond, then, els) => {
             verify_expr(f, cond)?;
             verify_exprs(f, then)?;
             verify_exprs(f, els)?;
+        }
+        hir::Expr::ValuedIf(cond, then, els) => {
+            verify_expr(f, cond)?;
+            verify_exprs(f, then)?;
+            verify_exprs(f, els)?;
+        }
+        hir::Expr::Yield(v) => {
+            verify_expr(f, v)?;
+            assert(&v.1, &e.1)?;
         }
         hir::Expr::While(cond, body) => {
             verify_expr(f, cond)?;
@@ -80,9 +93,6 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
                     assert(&e.1, &hir::Ty::Any)?;
                 }
             }
-        }
-        hir::Expr::Para(es) => {
-            verify_exprs(f, es)?;
         }
     }
     Ok(())

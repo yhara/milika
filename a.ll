@@ -18,17 +18,47 @@ declare i64 @chiika_env_ref(ptr, i64)
 declare i64 @chiika_start_tokio(i64)
 
 define i64 @chiika_main() {
-  br i1 true, label %1, label %3
+  %1 = call i64 @print(i64 123)
+  br i1 true, label %2, label %4
 
-1:                                                ; preds = %0
-  %2 = call i64 @print(i64 456)
-  br label %5
+2:                                                ; preds = %0
+  %3 = call i64 @"chiika_main't"()
+  br label %6
 
-3:                                                ; preds = %0
-  %4 = call i64 @print(i64 789)
-  br label %5
+4:                                                ; preds = %0
+  %5 = call i64 @"chiika_main'f"()
+  br label %6
 
-5:                                                ; preds = %1, %3
+6:                                                ; preds = %2, %4
+  %7 = phi i64 [ %5, %4 ], [ %3, %2 ]
+  br label %8
+
+8:                                                ; preds = %6
+  ret i64 %7
+}
+
+define ptr @"chiika_main't"(ptr %0, ptr %1) {
+  %3 = call i64 @chiika_env_push(ptr %0, ptr %1)
+  %4 = call ptr @sleep_sec(ptr %0, ptr @"chiika_main't_1", i64 1)
+  ret ptr %4
+}
+
+define ptr @"chiika_main't_1"(ptr %0, i64 %1) {
+  %3 = call i64 @print(i64 456)
+  %4 = call ptr @chiika_env_pop(ptr %0, i64 1)
+  %5 = call i64 @"chiika_main'e"()
+  %6 = call ptr %4(ptr %0, i64 %5)
+  ret ptr %6
+}
+
+define i64 @"chiika_main'f"() {
+  %1 = call i64 @print(i64 789)
+  %2 = call i64 @"chiika_main'e"()
+  ret i64 %2
+}
+
+define i64 @"chiika_main'e"() {
+  %1 = call i64 @print(i64 0)
   ret i64 0
 }
 

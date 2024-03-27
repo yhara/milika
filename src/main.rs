@@ -1,8 +1,8 @@
 mod ast;
-mod async_splitter;
 mod asyncness_check;
 mod compiler;
 mod hir;
+mod hir_lowering;
 mod parser;
 mod prelude;
 mod typing;
@@ -18,8 +18,12 @@ fn main() -> Result<()> {
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
     let mut hir = compile(&src, &path)?;
 
-    let prelude_txt = prelude::prelude_funcs(main_is_async(&hir)?);
+    // Comile prelude
+    let is_async = main_is_async(&hir)?;
+    dbg!(&is_async);
+    let prelude_txt = prelude::prelude_funcs(is_async);
     let mut prelude_hir = compile(&prelude_txt, "src/prelude.rs")?;
+    // Merge prelude into main
     for e in prelude_hir.externs {
         if !e.is_internal {
             hir.externs.push(e);
@@ -49,7 +53,11 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
         }
     };
     let hir = typing::run(ast)?;
-    let hir = async_splitter::run(hir)?;
+    println!("-- typing\n{hir}");
+    let hir = hir_lowering::lower_async_if::run(hir)?;
+    println!("-- lower_async_if\n{hir}");
+    let hir = hir_lowering::async_splitter::run(hir)?;
+    println!("-- async_splitter\n{hir}");
     Ok(hir)
 }
 
