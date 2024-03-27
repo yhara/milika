@@ -216,7 +216,6 @@ impl AsyncSplitter {
                     "[BUG] cast should not appear before async_splitter"
                 ))
             }
-            hir::Expr::Para(_) => todo!(),
         };
         Ok(new_e)
     }

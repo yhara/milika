@@ -195,9 +195,6 @@ impl<'c> Compiler<'c> {
             hir::Expr::Cast(expr, cast_type) => {
                 self.compile_cast(func_block, block, lvars, expr, cast_type)
             }
-            hir::Expr::Para(_exprs) => todo!(),
-            //self.compile_para(func_block, block, lvars, exprs),
-            //_ => todo!("{:?}", texpr),
         }
     }
 

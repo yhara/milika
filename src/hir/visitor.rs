@@ -73,7 +73,6 @@ pub trait HirVisitor {
             hir::Expr::Cast(_, expr) => {
                 self.visit_expr(expr)?;
             }
-            hir::Expr::Para(_) => todo!(),
         }
         self.visit_expr(expr)?;
         Ok(())

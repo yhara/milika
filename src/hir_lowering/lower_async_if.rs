@@ -119,7 +119,6 @@ impl<'a> LowerAsyncIf<'a> {
                     "[BUG] cast should not appear before lower_async_if"
                 ))
             }
-            hir::Expr::Para(_) => todo!(),
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
                 self.compile_if(*cond_expr, then_exprs, else_exprs)?
             }
