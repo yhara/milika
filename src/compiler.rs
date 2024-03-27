@@ -69,24 +69,26 @@ impl<'c> Compiler<'c> {
             block.append_operation(self.compile_func(f)?);
         }
 
-        //module.as_operation().dump();
-        //println!("--");
-        //assert!(module.as_operation().verify());
+        if false {
+            module.as_operation().dump();
+            println!("--");
+            assert!(module.as_operation().verify());
 
-        // Convert to LLVM Dialect
-        //module.as_operation().dump();
-        //let pass_manager = PassManager::new(&self.context);
-        //pass_manager.add_pass(pass::conversion::create_func_to_llvm());
-        ////pass_manager
-        ////    .nested_under("func.func")
-        ////    .add_pass(pass::conversion::create_arith_to_llvm());
-        ////pass_manager
-        ////    .nested_under("func.func")
-        ////    .add_pass(pass::conversion::create_index_to_llvm());
-        //pass_manager.add_pass(pass::conversion::create_scf_to_control_flow());
-        //pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
-        //pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
-        //pass_manager.run(&mut module).unwrap();
+            // Convert to LLVM Dialect
+            module.as_operation().dump();
+            let pass_manager = PassManager::new(&self.context);
+            pass_manager.add_pass(pass::conversion::create_func_to_llvm());
+            //pass_manager
+            //    .nested_under("func.func")
+            //    .add_pass(pass::conversion::create_arith_to_llvm());
+            //pass_manager
+            //    .nested_under("func.func")
+            //    .add_pass(pass::conversion::create_index_to_llvm());
+            pass_manager.add_pass(pass::conversion::create_scf_to_control_flow());
+            pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
+            pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
+            pass_manager.run(&mut module).unwrap();
+        }
         eprintln!("--CUTHERE--");
         module.as_operation().dump();
         //assert!(module.as_operation().verify());
