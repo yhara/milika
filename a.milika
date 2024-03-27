@@ -14,6 +14,7 @@ extern(async) sleep_sec(Int n) -> Null
 fun chiika_main() -> Null {
   print(123)
   if (true) {
+    sleep_sec(1)
     print(456)
   } else {
     print(789)

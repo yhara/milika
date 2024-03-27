@@ -123,7 +123,7 @@ impl<'c> Compiler<'c> {
         Ok(dialect::func::func(
             &self.context,
             self.str_attr(&f.name),
-            TypeAttribute::new(self.function_type(&f.fun_ty(false))?.into()),
+            TypeAttribute::new(self.function_type(&f.fun_ty())?.into()),
             region,
             &[],
             self.unknown_loc(),
@@ -596,6 +596,7 @@ impl<'c> Compiler<'c> {
             hir::Ty::Int | hir::Ty::Null => self.int_type().into(),
             hir::Ty::Bool => Type::parse(&self.context, "i1").unwrap(),
             hir::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
+            hir::Ty::Async(_) => todo!(),
         };
         Ok(t)
     }
