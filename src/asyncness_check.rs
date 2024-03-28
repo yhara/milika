@@ -73,7 +73,7 @@ fn check_async(
                 return Err(anyhow!("not a function: {:?}", fexpr));
             };
             if let Some(fun_ty) = sigs.get(fname) {
-                if fun_ty.is_async() {
+                if fun_ty.ret_ty.is_async() {
                     // This function has an async call.
                     Ok(Either::Right(true))
                 } else {

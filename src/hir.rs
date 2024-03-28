@@ -200,6 +200,13 @@ impl Ty {
     pub fn is_async(&self) -> bool {
         matches!(self, Ty::Async(_))
     }
+
+    pub fn async_result_ty(&self) -> Option<&Ty> {
+        match self {
+            Ty::Async(t) => Some(t),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,7 +238,6 @@ impl TryFrom<ast::FunTy> for FunTy {
 
     fn try_from(x: ast::FunTy) -> Result<Self> {
         Ok(Self {
-            is_async: false,
             param_tys: x
                 .param_tys
                 .into_iter()
@@ -258,10 +264,6 @@ impl FunTy {
                 .collect::<Result<_>>()?,
             ret_ty: Box::new(t),
         })
-    }
-
-    pub fn is_async(&self) -> bool {
-        self.ret_ty.is_async()
     }
 }
 
