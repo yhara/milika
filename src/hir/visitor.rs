@@ -1,5 +1,5 @@
 use crate::hir;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 pub trait HirVisitor {
     /// Callback function.
@@ -81,6 +81,7 @@ pub trait HirVisitor {
 
 pub struct Allocs(Vec<(String, hir::Ty)>);
 impl Allocs {
+    /// Collects `alloc`ed variable names and their types.
     pub fn collect(body_stmts: &[hir::TypedExpr]) -> Result<Vec<(String, hir::Ty)>> {
         let mut a = Allocs(vec![]);
         a.walk_exprs(body_stmts)?;
@@ -95,6 +96,41 @@ impl HirVisitor for Allocs {
             }
             _ => {}
         }
+        Ok(())
+    }
+}
+
+pub struct NoAsyncTy(());
+impl NoAsyncTy {
+    /// Asserts that there is no `async` type in the program.
+    pub fn check(hir: &hir::Program) -> Result<()> {
+        let mut a = NoAsyncTy(());
+        for e in &hir.externs {
+            for p in &e.params {
+                assert_no_async_ty(&p.ty).context(format!("in extern: {:?}", e))?;
+            }
+            assert_no_async_ty(&e.ret_ty).context(format!("in extern: {:?}", e))?;
+        }
+        for f in &hir.funcs {
+            for p in &f.params {
+                assert_no_async_ty(&p.ty).context(format!("in func: {:?}", f))?;
+            }
+            assert_no_async_ty(&f.ret_ty).context(format!("in func: {:?}", f))?;
+        }
+        a.walk_hir(hir)?;
+        Ok(a.0)
+    }
+}
+impl HirVisitor for NoAsyncTy {
+    fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<()> {
+        assert_no_async_ty(&texpr.1).context(format!("in expr: {:?}", texpr))
+    }
+}
+
+fn assert_no_async_ty(ty: &hir::Ty) -> Result<()> {
+    if matches!(ty, hir::Ty::Async(_)) {
+        Err(anyhow::anyhow!("async type found: {:?}", ty))
+    } else {
         Ok(())
     }
 }
