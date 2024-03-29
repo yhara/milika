@@ -23,7 +23,6 @@ impl fmt::Display for Program {
 
 #[derive(Debug, Clone)]
 pub struct Extern {
-    pub is_async: bool,
     pub is_internal: bool,
     pub name: String,
     pub params: Vec<Param>,
@@ -39,8 +38,8 @@ impl TryFrom<ast::Extern> for Extern {
 
 impl Extern {
     pub fn from_ast(x: &ast::Extern) -> Result<Self> {
+        let t = x.ret_ty.clone().try_into()?;
         Ok(Self {
-            is_async: x.is_async,
             is_internal: x.is_internal,
             name: x.name.clone(),
             params: x
@@ -48,13 +47,16 @@ impl Extern {
                 .iter()
                 .map(|x| x.clone().try_into())
                 .collect::<Result<_>>()?,
-            ret_ty: x.ret_ty.clone().try_into()?,
+            ret_ty: if x.is_async {
+                Ty::Async(Box::new(t))
+            } else {
+                t
+            },
         })
     }
 
     pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async: self.is_async,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -63,7 +65,6 @@ impl Extern {
 
 impl fmt::Display for Extern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let asyn = if self.is_async { "(async)" } else { "" };
         let inte = if self.is_internal { "(internal)" } else { "" };
         let para = self
             .params
@@ -73,8 +74,8 @@ impl fmt::Display for Extern {
             .join(", ");
         write!(
             f,
-            "extern{}{} {}({}) -> {};\n",
-            asyn, inte, self.name, para, self.ret_ty
+            "extern{} {}({}) -> {};\n",
+            inte, self.name, para, self.ret_ty
         )
     }
 }
@@ -104,9 +105,8 @@ impl fmt::Display for Function {
 }
 
 impl Function {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy {
+    pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -155,6 +155,7 @@ pub enum Ty {
     Int,
     Bool,
     Fun(FunTy),
+    Async(Box<Ty>),
 }
 
 impl fmt::Display for Ty {
@@ -191,16 +192,25 @@ impl TryFrom<ast::Ty> for Ty {
 impl Ty {
     pub fn chiika_cont() -> Ty {
         Ty::Fun(FunTy {
-            is_async: false,
             param_tys: vec![Ty::ChiikaEnv, Ty::Any],
             ret_ty: Box::new(Ty::RustFuture),
         })
+    }
+
+    pub fn is_async(&self) -> bool {
+        matches!(self, Ty::Async(_))
+    }
+
+    pub fn async_result_ty(&self) -> Option<&Ty> {
+        match self {
+            Ty::Async(t) => Some(t),
+            _ => None,
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunTy {
-    pub is_async: bool,
     pub param_tys: Vec<Ty>,
     pub ret_ty: Box<Ty>,
 }
@@ -228,7 +238,6 @@ impl TryFrom<ast::FunTy> for FunTy {
 
     fn try_from(x: ast::FunTy) -> Result<Self> {
         Ok(Self {
-            is_async: false,
             param_tys: x
                 .param_tys
                 .into_iter()
@@ -241,14 +250,19 @@ impl TryFrom<ast::FunTy> for FunTy {
 
 impl FunTy {
     pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Result<Self> {
+        let orig_t = f.ret_ty.clone().try_into()?;
+        let t = if is_async {
+            Ty::Async(Box::new(orig_t))
+        } else {
+            orig_t
+        };
         Ok(Self {
-            is_async,
             param_tys: f
                 .params
                 .iter()
                 .map(|x| x.ty.clone().try_into())
                 .collect::<Result<_>>()?,
-            ret_ty: Box::new(f.ret_ty.clone().try_into()?),
+            ret_ty: Box::new(t),
         })
     }
 }

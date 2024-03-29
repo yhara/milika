@@ -11,6 +11,8 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::Fu
     let mut funcs = HashMap::new();
     let mut queue = vec![];
     // 1st pass
+    // Check asyncness of externs
+    // Collect function names
     for decl in decls {
         match decl {
             ast::Declaration::Extern(x) => {
@@ -24,6 +26,7 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::Fu
     }
 
     // 2nd pass
+    // Check asyncness of functions until all are resolved
     while let Some(func_name) = queue.pop() {
         let func = funcs.get(&func_name).unwrap();
         match gather_sig(func, &sigs)? {
@@ -41,6 +44,8 @@ pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::Fu
     Ok(sigs)
 }
 
+/// Check asyncness of a function
+/// Returns the function name if it depends on the asyncness of another function
 fn gather_sig(
     func: &ast::Function,
     sigs: &HashMap<String, hir::FunTy>,
@@ -55,6 +60,8 @@ fn gather_sig(
     Ok(Either::Right(hir::FunTy::from_ast_func(func, is_async)?))
 }
 
+/// Check if the expression is async
+/// Returns the function name if it depends on the asyncness of another function
 fn check_async(
     func_name: &str,
     expr: &ast::Expr,
@@ -66,7 +73,8 @@ fn check_async(
                 return Err(anyhow!("not a function: {:?}", fexpr));
             };
             if let Some(fun_ty) = sigs.get(fname) {
-                if fun_ty.is_async {
+                if fun_ty.ret_ty.is_async() {
+                    // This function has an async call.
                     Ok(Either::Right(true))
                 } else {
                     let mut is_async = false;
