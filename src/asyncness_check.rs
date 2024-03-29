@@ -6,6 +6,8 @@ use std::collections::HashMap;
 
 type FuncName = String;
 
+/// Gather function signatures from declarations and change
+/// return types of async functions to Async(_)
 pub fn gather_sigs(decls: &[ast::Declaration]) -> Result<HashMap<String, hir::FunTy>> {
     let mut sigs = HashMap::new();
     let mut funcs = HashMap::new();
@@ -57,6 +59,7 @@ fn gather_sig(
             Either::Right(b) => is_async = is_async || b,
         }
     }
+    dbg!(&func.name, is_async);
     Ok(Either::Right(hir::FunTy::from_ast_func(func, is_async)?))
 }
 
@@ -73,6 +76,7 @@ fn check_async(
                 return Err(anyhow!("not a function: {:?}", fexpr));
             };
             if let Some(fun_ty) = sigs.get(fname) {
+                dbg!(func_name, fname, fun_ty);
                 if fun_ty.ret_ty.is_async() {
                     // This function has an async call.
                     Ok(Either::Right(true))
@@ -97,3 +101,16 @@ fn check_async(
         _ => Ok(Either::Right(false)),
     }
 }
+
+pub struct CheckAsync(());
+impl CheckAsync {
+    fn check() -> Result<bool, FuncName> {
+    }
+}
+impl HirVisitor for CheckAsync {
+    fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<bool, FuncName> {
+
+        assert_no_async_ty(&texpr.1).context(format!("in expr: {:?}", texpr))
+    }
+}
+

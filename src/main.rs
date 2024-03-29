@@ -53,11 +53,11 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
         }
     };
     let hir = typing::run(ast)?;
-    //println!("{hir}");
+    println!("-- typing\n{hir}");
     let hir = hir_lowering::lower_async_if::run(hir)?;
-    //println!("{hir}");
+    println!("-- lower_async_if\n{hir}");
     let hir = hir_lowering::async_splitter::run(hir)?;
-    //println!("{hir}");
+    println!("-- async_splitter\n{hir}");
     Ok(hir)
 }
 

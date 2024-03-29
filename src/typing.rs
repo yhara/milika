@@ -13,13 +13,16 @@ pub fn run(ast: ast::Program) -> Result<hir::Program> {
     let c = Typing {
         sigs: asyncness_check::gather_sigs(&ast)?,
     };
+    dbg!(&c.sigs);
     let mut externs = vec![];
     let mut funcs = vec![];
     for decl in ast {
         match decl {
             ast::Declaration::Extern(e) => externs.push(e.try_into()?),
             ast::Declaration::Function(f) => {
-                funcs.push(c.compile_func(f)?);
+                // Get the (maybe async) ty from sigs
+                let ret_ty = c.sigs.get(&f.name).unwrap().ret_ty.clone();
+                funcs.push(c.compile_func(f, *ret_ty)?);
             }
         }
     }
@@ -27,7 +30,7 @@ pub fn run(ast: ast::Program) -> Result<hir::Program> {
 }
 
 impl Typing {
-    fn compile_func(&self, f: ast::Function) -> Result<hir::Function> {
+    fn compile_func(&self, f: ast::Function, ret_ty: hir::Ty) -> Result<hir::Function> {
         let mut lvars = HashMap::new();
         let body_stmts = f
             .body_stmts
@@ -41,7 +44,7 @@ impl Typing {
                 .into_iter()
                 .map(|x| x.try_into())
                 .collect::<Result<Vec<_>>>()?,
-            ret_ty: f.ret_ty.try_into()?,
+            ret_ty,
             body_stmts,
         })
     }
