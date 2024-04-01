@@ -1,3 +1,5 @@
+pub mod typing;
+pub mod untyped;
 pub mod visitor;
 use crate::ast;
 use anyhow::{anyhow, Result};
@@ -29,32 +31,7 @@ pub struct Extern {
     pub ret_ty: Ty,
 }
 
-impl TryFrom<ast::Extern> for Extern {
-    type Error = anyhow::Error;
-    fn try_from(x: ast::Extern) -> Result<Self> {
-        Extern::from_ast(&x)
-    }
-}
-
 impl Extern {
-    pub fn from_ast(x: &ast::Extern) -> Result<Self> {
-        let t = x.ret_ty.clone().try_into()?;
-        Ok(Self {
-            is_internal: x.is_internal,
-            name: x.name.clone(),
-            params: x
-                .params
-                .iter()
-                .map(|x| x.clone().try_into())
-                .collect::<Result<_>>()?,
-            ret_ty: if x.is_async {
-                Ty::Async(Box::new(t))
-            } else {
-                t
-            },
-        })
-    }
-
     pub fn fun_ty(&self) -> FunTy {
         FunTy {
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
@@ -119,17 +96,6 @@ pub struct Param {
     pub name: String,
 }
 
-impl TryFrom<ast::Param> for Param {
-    type Error = anyhow::Error;
-
-    fn try_from(x: ast::Param) -> Result<Self> {
-        Ok(Self {
-            ty: x.ty.try_into()?,
-            name: x.name,
-        })
-    }
-}
-
 impl Param {
     pub fn new(ty: Ty, name: impl Into<String>) -> Self {
         Self {
@@ -147,6 +113,9 @@ impl fmt::Display for Param {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
+    Unknown, // Not yet inferred
+    TyOfFunc(String),
+
     Null, // A unit type. Represented by `i64 0`
     Void, // eg. the type of `return` or assignment. There is no value of this type.
     Any,  // Corresponds to `ptr` in llvm
@@ -164,28 +133,6 @@ impl fmt::Display for Ty {
             Ty::Fun(fun_ty) => write!(f, "{}", fun_ty),
             _ => write!(f, "{:?}", self),
         }
-    }
-}
-
-impl TryFrom<ast::Ty> for Ty {
-    type Error = anyhow::Error;
-
-    fn try_from(x: ast::Ty) -> Result<Self> {
-        let t = match x {
-            ast::Ty::Raw(s) => match &s[..] {
-                "Null" => Ty::Null,
-                "Int" => Ty::Int,
-                "Bool" => Ty::Bool,
-                // Internally used types (in src/prelude.rs)
-                "ANY" => Ty::Any,
-                "ENV" => Ty::ChiikaEnv,
-                "FUTURE" => Ty::RustFuture,
-                "CONT" => Ty::chiika_cont(),
-                _ => return Err(anyhow!("unknown type: {s}")),
-            },
-            ast::Ty::Fun(f) => Ty::Fun(f.try_into()?),
-        };
-        Ok(t)
     }
 }
 
@@ -230,21 +177,6 @@ impl fmt::Display for FunTy {
 impl From<FunTy> for Ty {
     fn from(x: FunTy) -> Self {
         Ty::Fun(x)
-    }
-}
-
-impl TryFrom<ast::FunTy> for FunTy {
-    type Error = anyhow::Error;
-
-    fn try_from(x: ast::FunTy) -> Result<Self> {
-        Ok(Self {
-            param_tys: x
-                .param_tys
-                .into_iter()
-                .map(|x| x.try_into())
-                .collect::<Result<_>>()?,
-            ret_ty: Box::new((*x.ret_ty).try_into()?),
-        })
     }
 }
 
@@ -383,16 +315,39 @@ impl Expr {
         (Expr::FuncRef(name.into()), fun_ty.into())
     }
 
-    pub fn op_call(op: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr, ty: Ty) -> TypedExpr {
-        (Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty)
+    pub fn op_call(op_: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr) -> Result<TypedExpr> {
+        let ty = match &op[..] {
+            "+" | "-" | "*" | "/" => {
+                if lhs.1 != hir::Ty::Int || rhs.1 != hir::Ty::Int {
+                    return Err(anyhow!("invalid operand types for `{op}'"));
+                }
+                hir::Ty::Int
+            }
+            "==" | "!=" | "<" | "<=" | ">" | ">=" => {
+                if lhs.1 != rhs.1 {
+                    return Err(anyhow!("invalid operand types for `{op}'"));
+                }
+                hir::Ty::Bool
+            }
+            _ => return Err(anyhow!("[BUG] unknown operator `{op}'")),
+        };
+        Ok((Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty))
     }
 
-    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>, result_ty: Ty) -> TypedExpr {
+    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
+        let fun_ty = match &func.1 {
+            Ty::Fun(f) => f,
+            _ => return Err(anyhow!("not a function")),
+        };
+        let result_ty = fun_ty.ret_ty.clone();
         (Expr::FunCall(Box::new(func), args), result_ty)
     }
 
-    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
-        (Expr::If(Box::new(cond), then, else_), Ty::Void)
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> Result<TypedExpr> {
+        if cond.1 != hir::Ty::Bool {
+            return Err(anyhow!("if condition must be Bool"));
+        }
+        Ok((Expr::If(Box::new(cond), then, else_), Ty::Void))
     }
 
     pub fn valued_if(
@@ -400,6 +355,9 @@ impl Expr {
         then: Vec<TypedExpr>,
         else_: Vec<TypedExpr>,
     ) -> Result<TypedExpr> {
+        if cond.1 != hir::Ty::Bool {
+            return Err(anyhow!("if condition must be Bool"));
+        }
         let t1 = if let Some((Expr::Yield(e), _)) = then.last() {
             e.1.clone()
         } else {
@@ -425,8 +383,11 @@ impl Expr {
         (Expr::Yield(Box::new(e)), t)
     }
 
-    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> TypedExpr {
-        (Expr::While(Box::new(cond), body), Ty::Void)
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> Result<TypedExpr> {
+        if cond.1 != hir::Ty::Bool {
+            return Err(anyhow!("while condition must be Bool"));
+        }
+        Ok((Expr::While(Box::new(cond), body), Ty::Void))
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
