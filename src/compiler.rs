@@ -572,6 +572,7 @@ impl<'c> Compiler<'c> {
 
     fn mlir_type(&self, ty: &hir::Ty) -> Result<ir::Type<'c>> {
         let t = match ty {
+            hir::Ty::Unknown => return Err(anyhow!("Unknown is unexpected here")),
             hir::Ty::Void => return Err(anyhow!("void is unexpected here")),
             hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => self.ptr_type().into(),
             hir::Ty::Int | hir::Ty::Null => self.int_type().into(),
