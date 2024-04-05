@@ -1,3 +1,4 @@
+pub mod typing;
 pub mod untyped;
 use crate::ast;
 use anyhow::{anyhow, Result};
