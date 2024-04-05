@@ -1,11 +1,9 @@
 mod ast;
 mod async_splitter;
-mod asyncness_check;
 mod compiler;
 mod hir;
 mod parser;
 mod prelude;
-mod typing;
 mod verifier;
 use anyhow::{bail, Context, Result};
 use ariadne::{Label, Report, ReportKind, Source};
@@ -48,7 +46,9 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
             bail!("parse error");
         }
     };
-    let hir = typing::run(ast)?;
+    let mut hir = hir::untyped::create(&ast)?;
+    hir::typing::run(&mut hir)?;
+    //let hir = typing::run(ast)?;
     let hir = async_splitter::run(hir)?;
     Ok(hir)
 }

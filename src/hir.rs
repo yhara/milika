@@ -1,3 +1,5 @@
+pub mod typing;
+pub mod untyped;
 use crate::ast;
 use anyhow::{anyhow, Result};
 use std::fmt;
@@ -146,9 +148,10 @@ impl fmt::Display for Param {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
-    Null, // A unit type. Represented by `i64 0`
-    Void, // eg. the type of `return` or assignment. There is no value of this type.
-    Any,  // Corresponds to `ptr` in llvm
+    Unknown, // Used before typecheck
+    Null,    // A unit type. Represented by `i64 0`
+    Void,    // eg. the type of `return` or assignment. There is no value of this type.
+    Any,     // Corresponds to `ptr` in llvm
     ChiikaEnv,
     RustFuture,
     Int,
@@ -270,7 +273,6 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
-    Para(Vec<Typed<Expr>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -335,7 +337,6 @@ impl std::fmt::Display for Expr {
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}", e.0),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
-            Expr::Para(_exprs) => todo!(),
         }
     }
 }
