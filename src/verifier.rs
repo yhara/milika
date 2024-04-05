@@ -81,9 +81,6 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
                 }
             }
         }
-        hir::Expr::Para(es) => {
-            verify_exprs(f, es)?;
-        }
     }
     Ok(())
 }

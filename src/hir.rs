@@ -272,7 +272,6 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
-    Para(Vec<Typed<Expr>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -337,7 +336,6 @@ impl std::fmt::Display for Expr {
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}", e.0),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
-            Expr::Para(_exprs) => todo!(),
         }
     }
 }
