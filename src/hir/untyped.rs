@@ -77,17 +77,19 @@ impl Compiler {
             }
             ast::Expr::If(cond, then, els) => {
                 let cond = self.compile_expr(f, lvars, &cond)?;
-                let then = self.compile_exprs(f, lvars, &then)?;
-                let els = if let Some(els) = &els {
+                let mut then = self.compile_exprs(f, lvars, &then)?;
+                let mut els = if let Some(els) = &els {
                     self.compile_exprs(f, lvars, &els)?
                 } else {
                     vec![]
                 };
                 if ends_with_yield(&then) && ends_with_yield(&els) {
-                    hir::Expr::ValuedIf(Box::new(cond), then, els)
+                    hir::Expr::If(Box::new(cond), then, els)
                 } else if ends_with_yield(&then) || ends_with_yield(&els) {
                     return Err(anyhow!("yield must be in both (or neither) branches"));
                 } else {
+                    then.push(hir::Expr::yield_null());
+                    els.push(hir::Expr::yield_null());
                     hir::Expr::If(Box::new(cond), then, els)
                 }
             }

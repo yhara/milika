@@ -180,10 +180,7 @@ impl<'c> Compiler<'c> {
                 self.compile_funcall(func_block, block, lvars, fexpr, arg_exprs)
             }
             hir::Expr::If(cond, then, els) => {
-                self.compile_if(func_block, block, lvars, cond, then, els, false)
-            }
-            hir::Expr::ValuedIf(cond, then, els) => {
-                self.compile_if(func_block, block, lvars, cond, then, els, true)
+                self.compile_if(func_block, block, lvars, cond, then, els, &texpr.1)
             }
             hir::Expr::Yield(expr) => self.compile_yield(func_block, block, lvars, expr),
             hir::Expr::While(cond, exprs) => {
@@ -284,13 +281,8 @@ impl<'c> Compiler<'c> {
         cond_expr: &hir::TypedExpr,
         then: &[hir::TypedExpr],
         els: &[hir::TypedExpr],
-        valued: bool,
+        if_ty: &hir::Ty,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
-        let result_types = if valued {
-            vec![self.int_type().into()]
-        } else {
-            vec![]
-        };
         let cond_result = self.compile_value_expr(func_block, block, lvars, cond_expr)?;
         let then_region = {
             let region = ir::Region::new();
@@ -304,17 +296,12 @@ impl<'c> Compiler<'c> {
         };
         let op = dialect::scf::r#if(
             cond_result,
-            &result_types,
+            &[self.mlir_type(if_ty)?],
             then_region,
             else_region,
             self.unknown_loc(),
         );
-        if valued {
-            Ok(Some(val(block.append_operation(op))))
-        } else {
-            block.append_operation(op);
-            Ok(None)
-        }
+        Ok(Some(val(block.append_operation(op))))
     }
 
     fn compile_yield<'a>(

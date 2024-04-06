@@ -201,19 +201,7 @@ impl AsyncSplitter {
                     .into_iter()
                     .map(|e| self.compile_expr(orig_func, e))
                     .collect::<Result<Vec<_>>>()?;
-                hir::Expr::if_(new_cond, new_then, new_else)
-            }
-            hir::Expr::ValuedIf(cond_expr, then_exprs, else_exprs) => {
-                let new_cond = self.compile_expr(orig_func, *cond_expr)?;
-                let new_then = then_exprs
-                    .into_iter()
-                    .map(|e| self.compile_expr(orig_func, e))
-                    .collect::<Result<Vec<_>>>()?;
-                let new_else = else_exprs
-                    .into_iter()
-                    .map(|e| self.compile_expr(orig_func, e))
-                    .collect::<Result<Vec<_>>>()?;
-                hir::Expr::valued_if(new_cond, new_then, new_else)?
+                hir::Expr::if_(new_cond, new_then, new_else)?
             }
             hir::Expr::Yield(expr) => {
                 let new_expr = self.compile_expr(orig_func, *expr)?;

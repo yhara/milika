@@ -8,14 +8,18 @@ module {
   func.func private @chiika_start_tokio(i64) -> i64
   func.func @chiika_main() -> i64 {
     %true = arith.constant true
-    scf.if %true {
+    %0 = scf.if %true -> (i64) {
       %f = func.constant @print : (i64) -> i64
       %c456_i64 = arith.constant 456 : i64
-      %0 = func.call_indirect %f(%c456_i64) : (i64) -> i64
+      %1 = func.call_indirect %f(%c456_i64) : (i64) -> i64
+      %c0_i64_0 = arith.constant 0 : i64
+      scf.yield %c0_i64_0 : i64
     } else {
       %f = func.constant @print : (i64) -> i64
       %c789_i64 = arith.constant 789 : i64
-      %0 = func.call_indirect %f(%c789_i64) : (i64) -> i64
+      %1 = func.call_indirect %f(%c789_i64) : (i64) -> i64
+      %c0_i64_0 = arith.constant 0 : i64
+      scf.yield %c0_i64_0 : i64
     }
     %c0_i64 = arith.constant 0 : i64
     return %c0_i64 : i64

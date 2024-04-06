@@ -97,12 +97,6 @@ impl<'f> Typing<'f> {
             }
             hir::Expr::If(cond, then, els) => {
                 self.compile_expr(lvars, &mut *cond)?;
-                self.compile_exprs(lvars, then)?;
-                self.compile_exprs(lvars, els)?;
-                e.1 = hir::Ty::Void;
-            }
-            hir::Expr::ValuedIf(cond, then, els) => {
-                self.compile_expr(lvars, &mut *cond)?;
                 if cond.1 != hir::Ty::Bool {
                     return Err(anyhow!("condition should be bool but got {:?}", cond.1));
                 }

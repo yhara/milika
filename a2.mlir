@@ -12,15 +12,19 @@ module attributes {llvm.data_layout = ""} {
     %1 = llvm.mlir.addressof @print : !llvm.ptr
     %2 = llvm.mlir.constant(456 : i64) : i64
     %3 = llvm.call %1(%2) : !llvm.ptr, (i64) -> i64
-    llvm.br ^bb3
+    %4 = llvm.mlir.constant(0 : i64) : i64
+    llvm.br ^bb3(%4 : i64)
   ^bb2:  // pred: ^bb0
-    %4 = llvm.mlir.addressof @print : !llvm.ptr
-    %5 = llvm.mlir.constant(789 : i64) : i64
-    %6 = llvm.call %4(%5) : !llvm.ptr, (i64) -> i64
-    llvm.br ^bb3
-  ^bb3:  // 2 preds: ^bb1, ^bb2
-    %7 = llvm.mlir.constant(0 : i64) : i64
-    llvm.return %7 : i64
+    %5 = llvm.mlir.addressof @print : !llvm.ptr
+    %6 = llvm.mlir.constant(789 : i64) : i64
+    %7 = llvm.call %5(%6) : !llvm.ptr, (i64) -> i64
+    %8 = llvm.mlir.constant(0 : i64) : i64
+    llvm.br ^bb3(%8 : i64)
+  ^bb3(%9: i64):  // 2 preds: ^bb1, ^bb2
+    llvm.br ^bb4
+  ^bb4:  // pred: ^bb3
+    %10 = llvm.mlir.constant(0 : i64) : i64
+    llvm.return %10 : i64
   }
   llvm.func @chiika_start_user(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
     %0 = llvm.mlir.addressof @chiika_main : !llvm.ptr

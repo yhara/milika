@@ -43,7 +43,7 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
                 .zip(args.iter())
                 .try_for_each(|(p, a)| assert(&a.1, p))?;
         }
-        hir::Expr::If(cond, then, els) | hir::Expr::ValuedIf(cond, then, els) => {
+        hir::Expr::If(cond, then, els) => {
             verify_expr(f, cond)?;
             verify_exprs(f, then)?;
             verify_exprs(f, els)?;

@@ -254,7 +254,6 @@ pub enum Expr {
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
-    ValuedIf(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
     Yield(Box<Typed<Expr>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     Alloc(String),
@@ -299,7 +298,7 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, ")")
             }
-            Expr::If(cond, then, else_) | Expr::ValuedIf(cond, then, else_) => {
+            Expr::If(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
                     write!(f, "  {}\n", stmt.0)?;
@@ -351,33 +350,30 @@ impl Expr {
         (Expr::FunCall(Box::new(func), args), result_ty)
     }
 
-    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
-        (Expr::If(Box::new(cond), then, else_), Ty::Void)
-    }
-
-    pub fn valued_if(
-        cond: TypedExpr,
-        then: Vec<TypedExpr>,
-        else_: Vec<TypedExpr>,
-    ) -> Result<TypedExpr> {
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> Result<TypedExpr> {
         if cond.1 != Ty::Bool {
             return Err(anyhow!("[BUG] if cond not bool: {:?}", cond));
         }
         let t1 = yielded_ty(&then);
         let t2 = yielded_ty(&else_);
-        if t1 != t2 || t1.is_none() {
+        if t1 != t2 || t1.is_none() || t2.is_none() {
             return Err(anyhow!(
-                "[BUG] valued_if type invalid (t1: {:?}, t2: {:?})",
+                "[BUG] if type invalid (t1: {:?}, t2: {:?})",
                 t1,
                 t2
             ));
         }
-        Ok((Expr::ValuedIf(Box::new(cond), then, else_), t1.unwrap()))
+        Ok((Expr::If(Box::new(cond), then, else_), t1.unwrap()))
     }
 
     pub fn yield_(expr: TypedExpr) -> TypedExpr {
         let t = expr.1.clone();
         (Expr::Yield(Box::new(expr)), t)
+    }
+
+    pub fn yield_null() -> TypedExpr {
+        let null = (Expr::PseudoVar(PseudoVar::Null), Ty::Null);
+        (Expr::Yield(Box::new(null)), Ty::Null)
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
