@@ -180,8 +180,9 @@ impl<'c> Compiler<'c> {
                 self.compile_funcall(func_block, block, lvars, fexpr, arg_exprs)
             }
             hir::Expr::If(cond, then, els) => {
-                self.compile_if(func_block, block, lvars, cond, then, els)
+                self.compile_if(func_block, block, lvars, cond, then, els, &texpr.1)
             }
+            hir::Expr::Yield(expr) => self.compile_yield(func_block, block, lvars, expr),
             hir::Expr::While(cond, exprs) => {
                 self.compile_while(func_block, block, lvars, cond, exprs)
             }
@@ -280,25 +281,38 @@ impl<'c> Compiler<'c> {
         cond_expr: &hir::TypedExpr,
         then: &[hir::TypedExpr],
         els: &[hir::TypedExpr],
+        if_ty: &hir::Ty,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         let cond_result = self.compile_value_expr(func_block, block, lvars, cond_expr)?;
         let then_region = {
             let region = ir::Region::new();
-            region.append_block(self.compile_exprs(func_block, lvars, then, true)?);
+            region.append_block(self.compile_exprs(func_block, lvars, then)?);
             region
         };
         let else_region = {
             let region = ir::Region::new();
-            region.append_block(self.compile_exprs(func_block, lvars, els, true)?);
+            region.append_block(self.compile_exprs(func_block, lvars, els)?);
             region
         };
         let op = dialect::scf::r#if(
             cond_result,
-            Default::default(),
+            &[self.mlir_type(if_ty)?],
             then_region,
             else_region,
             self.unknown_loc(),
         );
+        Ok(Some(val(block.append_operation(op))))
+    }
+
+    fn compile_yield<'a>(
+        &self,
+        func_block: &'a ir::Block<'c>,
+        block: &'a ir::Block<'c>,
+        lvars: &mut TrainMap<String, ir::Value<'c, 'a>>,
+        expr: &hir::TypedExpr,
+    ) -> Result<Option<ir::Value<'c, 'a>>> {
+        let v = self.compile_value_expr(func_block, block, lvars, expr)?;
+        let op = dialect::scf::r#yield(&[v], self.unknown_loc());
         block.append_operation(op);
         Ok(None)
     }
@@ -322,7 +336,7 @@ impl<'c> Compiler<'c> {
         };
         let after_region = {
             let region = ir::Region::new();
-            let block = self.compile_exprs(func_block, lvars, exprs, true)?;
+            let block = self.compile_exprs(func_block, lvars, exprs)?;
             region.append_block(block);
             region
         };
@@ -511,43 +525,14 @@ impl<'c> Compiler<'c> {
         func_block: &'a ir::Block<'c>,
         lvars: &mut TrainMap<String, ir::Value<'c, '_>>,
         exprs: &[hir::TypedExpr],
-        terminate: bool,
     ) -> Result<ir::Block<'c>> {
         let block = ir::Block::new(&[]);
         let mut lvars = lvars.fork();
         for expr in exprs {
             self.compile_expr(func_block, &block, &mut lvars, expr)?;
         }
-        if terminate {
-            let op = dialect::scf::r#yield(&[], self.unknown_loc());
-            block.append_operation(op);
-        }
         Ok(block)
     }
-
-    //            ast::Expr::Para(exprs) => {
-    //                let block = ir::Block::new(&[]);
-    //                for expr in exprs {
-    //                    self.compile_expr(&block, lvars, expr)?;
-    //                }
-    //                let zero = self.compile_number(&block, 0);
-    //                block.append_operation(
-    //                    r#async::YieldOp::builder(&self.context, self.unknown_loc())
-    //                        .operands(&[val(&zero)])
-    //                        .build()
-    //                        .into(),
-    //                );
-    //                let region = ir::Region::new();
-    //                region.append_block(block);
-    //                r#async::ExecuteOp::builder(&self.context, self.unknown_loc())
-    //                    .token(Type::parse(&self.context, "!async.token").unwrap())
-    //                    .body_results(&[Type::parse(&self.context, "!async.value<i64>").unwrap()])
-    //                    .dependencies(&[])
-    //                    .body_operands(&[])
-    //                    .body_region(region)
-    //                    .build()
-    //                    .into()
-    //            }
 
     fn const_int(&self, n: i64) -> ir::Operation<'c> {
         dialect::arith::constant(

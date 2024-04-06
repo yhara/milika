@@ -45,7 +45,8 @@ See examples/\*.milika or src/ast.rs.
   - Variable assignment
     - `x = 1`
   - If
-    - `if (x) { ... } else { ... }`
+    - `if (x) { ... } else { ... }` #=> statement if
+    - `if (x) { ... yield 1 } else { ... yield 2 }` #=> expression if
   - While
     - `while (x) { ... }`
   - Return
@@ -65,7 +66,6 @@ See examples/\*.milika or src/ast.rs.
 - Support `return x` from async Milika func
   - Must be replaced with like `$cont($env, x); return`
 - Support `if` in async Milika func
-- Support `if` with value 
 - Support async call in if condition
 - Support `while` in async Milika func
 

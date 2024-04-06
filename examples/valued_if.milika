@@ -1,0 +1,12 @@
+extern print(Int n) -> Null
+fun chiika_main() -> Null {
+  print(
+    if (true) {
+      yield 456
+    } else {
+      yield 789
+    }
+  )
+  return null
+}
+

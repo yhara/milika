@@ -241,20 +241,6 @@ impl TryFrom<ast::FunTy> for FunTy {
     }
 }
 
-impl FunTy {
-    pub fn from_ast_func(f: &ast::Function, is_async: bool) -> Result<Self> {
-        Ok(Self {
-            is_async,
-            param_tys: f
-                .params
-                .iter()
-                .map(|x| x.ty.clone().try_into())
-                .collect::<Result<_>>()?,
-            ret_ty: Box::new(f.ret_ty.clone().try_into()?),
-        })
-    }
-}
-
 type Typed<T> = (T, Ty);
 pub type TypedExpr = Typed<Expr>;
 
@@ -268,6 +254,7 @@ pub enum Expr {
     OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
     FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
+    Yield(Box<Typed<Expr>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
@@ -326,6 +313,7 @@ impl std::fmt::Display for Expr {
                 }
                 Ok(())
             }
+            Expr::Yield(e) => write!(f, "yield {}", e.0),
             Expr::While(cond, body) => {
                 write!(f, "while {} {{\n", cond.0)?;
                 for stmt in body {
@@ -362,8 +350,30 @@ impl Expr {
         (Expr::FunCall(Box::new(func), args), result_ty)
     }
 
-    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
-        (Expr::If(Box::new(cond), then, else_), Ty::Void)
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> Result<TypedExpr> {
+        if cond.1 != Ty::Bool {
+            return Err(anyhow!("[BUG] if cond not bool: {:?}", cond));
+        }
+        let t1 = yielded_ty(&then);
+        let t2 = yielded_ty(&else_);
+        if t1 != t2 || t1.is_none() || t2.is_none() {
+            return Err(anyhow!(
+                "[BUG] if type invalid (t1: {:?}, t2: {:?})",
+                t1,
+                t2
+            ));
+        }
+        Ok((Expr::If(Box::new(cond), then, else_), t1.unwrap()))
+    }
+
+    pub fn yield_(expr: TypedExpr) -> TypedExpr {
+        let t = expr.1.clone();
+        (Expr::Yield(Box::new(expr)), t)
+    }
+
+    pub fn yield_null() -> TypedExpr {
+        let null = (Expr::PseudoVar(PseudoVar::Null), Ty::Null);
+        (Expr::Yield(Box::new(null)), Ty::Null)
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
@@ -377,4 +387,14 @@ impl Expr {
     pub fn cast(e: TypedExpr, cast_type: CastType, ty: Ty) -> TypedExpr {
         (Expr::Cast(cast_type, Box::new(e)), ty)
     }
+}
+
+pub fn yielded_ty(stmts: &[TypedExpr]) -> Option<Ty> {
+    stmts
+        .last()
+        .map(|stmt| match &stmt.0 {
+            Expr::Yield(val) => Some(val.1.clone()),
+            _ => None,
+        })
+        .flatten()
 }

@@ -97,30 +97,26 @@ impl<'f> Typing<'f> {
             }
             hir::Expr::If(cond, then, els) => {
                 self.compile_expr(lvars, &mut *cond)?;
+                if cond.1 != hir::Ty::Bool {
+                    return Err(anyhow!("condition should be bool but got {:?}", cond.1));
+                }
                 self.compile_exprs(lvars, then)?;
                 self.compile_exprs(lvars, els)?;
-                e.1 = hir::Ty::Void;
+                let t1 = hir::yielded_ty(&then).unwrap();
+                let t2 = hir::yielded_ty(&els).unwrap();
+                if t1 != t2 {
+                    return Err(anyhow!(
+                        "then and else should have the same type but got {:?} and {:?}",
+                        t1,
+                        t2
+                    ));
+                }
+                e.1 = t1.clone();
             }
-            //hir::Expr::ValuedIf(cond, then, els) => {
-            //    let cond = self.compile_expr(lvars, cond)?;
-            //    if cond.1 != hir::Ty::Bool {
-            //        return Err(anyhow!("condition should be bool but got {:?}", cond.1));
-            //    }
-            //    let then = self.compile_expr(lvars, then)?;
-            //    let els = self.compile_expr(lvars, els)?;
-            //    if then.1 != els.1 {
-            //        return Err(anyhow!(
-            //            "then and else should have the same type but got {:?} and {:?}",
-            //            then.1,
-            //            els.1
-            //        ));
-            //    }
-            //    e.1 = then.1.clone();
-            //}
-            //hir::Expr::Yield(val) => {
-            //    self.compile_expr(lvars, val)?;
-            //    e.1 = hir::Ty::Void;
-            //}
+            hir::Expr::Yield(val) => {
+                self.compile_expr(lvars, val)?;
+                e.1 = val.1.clone();
+            }
             hir::Expr::While(cond, body) => {
                 self.compile_expr(lvars, cond)?;
                 self.compile_exprs(lvars, body)?;
