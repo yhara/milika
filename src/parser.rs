@@ -70,6 +70,7 @@ peg::parser! {
     rule expr() -> ast::Expr
       = alloc()
       / if()
+      / yield()
       / while()
       / return()
       / funcall()
@@ -83,6 +84,9 @@ peg::parser! {
       = "if" _ cond:expr() _ "{" _ then:stmts() _ "}" _ else_:else()? {
         ast::Expr::If(Box::new(cond), then, else_)
       }
+
+    rule yield() -> ast::Expr
+      = "yield" _ e:expr() { ast::Expr::Yield(Box::new(e)) }
 
     rule else() -> Vec<ast::Expr>
       = "else" _ "{" _ stmts:stmts() _ "}" { stmts }

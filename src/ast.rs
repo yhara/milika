@@ -50,6 +50,7 @@ pub enum Expr {
     OpCall(String, Box<Expr>, Box<Expr>),
     FunCall(Box<Expr>, Vec<Expr>),
     If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>),
+    Yield(Box<Expr>),
     While(Box<Expr>, Vec<Expr>),
     Alloc(String),
     Assign(String, Box<Expr>),

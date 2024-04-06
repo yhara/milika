@@ -83,7 +83,17 @@ impl Compiler {
                 } else {
                     vec![]
                 };
-                hir::Expr::If(Box::new(cond), then, els)
+                if ends_with_yield(&then) && ends_with_yield(&els) {
+                    hir::Expr::ValuedIf(Box::new(cond), then, els)
+                } else if ends_with_yield(&then) || ends_with_yield(&els) {
+                    return Err(anyhow!("yield must be in both (or neither) branches"));
+                } else {
+                    hir::Expr::If(Box::new(cond), then, els)
+                }
+            }
+            ast::Expr::Yield(v) => {
+                let e = self.compile_expr(f, lvars, v)?;
+                hir::Expr::Yield(Box::new(e))
             }
             ast::Expr::While(cond, body) => {
                 let cond = self.compile_expr(f, lvars, &cond)?;
@@ -189,4 +199,8 @@ fn compile_fun_ty(x: &ast::FunTy) -> Result<hir::FunTy> {
         param_tys,
         ret_ty,
     })
+}
+
+fn ends_with_yield(stmts: &[hir::TypedExpr]) -> bool {
+    matches!(stmts.last(), Some((hir::Expr::Yield(_), _)))
 }
