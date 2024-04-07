@@ -4,10 +4,12 @@ use crate::ast;
 use anyhow::{anyhow, Result};
 use std::fmt;
 
+pub type Program = Program_<Ty>;
+
 #[derive(Debug, Clone)]
-pub struct Program {
+pub struct Program_<TY> {
     pub externs: Vec<Extern>,
-    pub funcs: Vec<Function>,
+    pub funcs: Vec<Function_<TY>>,
 }
 
 impl fmt::Display for Program {
@@ -80,15 +82,17 @@ impl fmt::Display for Extern {
     }
 }
 
+pub type Function = Function_<Ty>;
+
 #[derive(Debug, Clone)]
-pub struct Function {
+pub struct Function_<TY> {
     pub name: String,
     pub params: Vec<Param>,
-    pub ret_ty: Ty,
-    pub body_stmts: Vec<Typed<Expr>>,
+    pub ret_ty: TY,
+    pub body_stmts: Vec<Typed<Expr_<TY>, TY>>,
 }
 
-impl fmt::Display for Function {
+impl<TY: fmt::Display> fmt::Display for Function_<TY> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let para = self
             .params
@@ -104,9 +108,9 @@ impl fmt::Display for Function {
     }
 }
 
-impl Function {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy {
-        FunTy {
+impl<TY: Clone> Function_<TY> {
+    pub fn fun_ty(&self, is_async: bool) -> FunTy_<TY> {
+        FunTy_ {
             is_async,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
@@ -200,14 +204,16 @@ impl Ty {
     }
 }
 
+pub type FunTy = FunTy_<Ty>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FunTy {
+pub struct FunTy_<TY> {
     pub is_async: bool,
     pub param_tys: Vec<Ty>,
-    pub ret_ty: Box<Ty>,
+    pub ret_ty: Box<TY>,
 }
 
-impl fmt::Display for FunTy {
+impl<TY: fmt::Display> fmt::Display for FunTy_<TY> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let para = self
             .param_tys
@@ -241,25 +247,31 @@ impl TryFrom<ast::FunTy> for FunTy {
     }
 }
 
-type Typed<T> = (T, Ty);
-pub type TypedExpr = Typed<Expr>;
+type Typed<X, TY> = (X, TY);
+type TypedExpr_<TY> = (Expr_<TY>, TY);
+pub type TypedExpr = TypedExpr_<Ty>;
+pub type Expr = Expr_<Ty>;
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum Expr_<TY> {
     Number(i64),
     PseudoVar(PseudoVar),
     LVarRef(String),
     ArgRef(usize),
     FuncRef(String),
-    OpCall(String, Box<Typed<Expr>>, Box<Typed<Expr>>),
-    FunCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
-    If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
-    Yield(Box<Typed<Expr>>),
-    While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
+    OpCall(String, Box<TypedExpr_<TY>>, Box<TypedExpr_<TY>>),
+    FunCall(Box<TypedExpr_<TY>>, Vec<TypedExpr_<TY>>),
+    If(
+        Box<TypedExpr_<TY>>,
+        Vec<TypedExpr_<TY>>,
+        Vec<TypedExpr_<TY>>,
+    ),
+    Yield(Box<TypedExpr_<TY>>),
+    While(Box<TypedExpr_<TY>>, Vec<TypedExpr_<TY>>),
     Alloc(String),
-    Assign(String, Box<Typed<Expr>>),
-    Return(Box<Typed<Expr>>),
-    Cast(CastType, Box<Typed<Expr>>),
+    Assign(String, Box<TypedExpr_<TY>>),
+    Return(Box<TypedExpr_<TY>>),
+    Cast(CastType, Box<TypedExpr_<TY>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -277,18 +289,18 @@ pub enum CastType {
     FunToAny,
 }
 
-impl std::fmt::Display for Expr {
+impl<TY> std::fmt::Display for Expr_<TY> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Number(n) => write!(f, "{}", n),
-            Expr::PseudoVar(PseudoVar::True) => write!(f, "true"),
-            Expr::PseudoVar(PseudoVar::False) => write!(f, "false"),
-            Expr::PseudoVar(PseudoVar::Null) => write!(f, "null"),
-            Expr::LVarRef(name) => write!(f, "{}", name),
-            Expr::ArgRef(idx) => write!(f, "%arg_{}", idx),
-            Expr::FuncRef(name) => write!(f, "{}", name),
-            Expr::OpCall(op, lhs, rhs) => write!(f, "({} {} {})", lhs.0, op, rhs.0),
-            Expr::FunCall(func, args) => {
+            Expr_::Number(n) => write!(f, "{}", n),
+            Expr_::PseudoVar(PseudoVar::True) => write!(f, "true"),
+            Expr_::PseudoVar(PseudoVar::False) => write!(f, "false"),
+            Expr_::PseudoVar(PseudoVar::Null) => write!(f, "null"),
+            Expr_::LVarRef(name) => write!(f, "{}", name),
+            Expr_::ArgRef(idx) => write!(f, "%arg_{}", idx),
+            Expr_::FuncRef(name) => write!(f, "{}", name),
+            Expr_::OpCall(op, lhs, rhs) => write!(f, "({} {} {})", lhs.0, op, rhs.0),
+            Expr_::FunCall(func, args) => {
                 write!(f, "{}(", func.0)?;
                 for (i, arg) in args.iter().enumerate() {
                     if i != 0 {
@@ -298,7 +310,7 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, ")")
             }
-            Expr::If(cond, then, else_) => {
+            Expr_::If(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
                     write!(f, "  {}\n", stmt.0)?;
@@ -313,23 +325,23 @@ impl std::fmt::Display for Expr {
                 }
                 Ok(())
             }
-            Expr::Yield(e) => write!(f, "yield {}", e.0),
-            Expr::While(cond, body) => {
+            Expr_::Yield(e) => write!(f, "yield {}", e.0),
+            Expr_::While(cond, body) => {
                 write!(f, "while {} {{\n", cond.0)?;
                 for stmt in body {
                     write!(f, "  {}\n", stmt.0)?;
                 }
                 write!(f, "}}")
             }
-            Expr::Alloc(name) => write!(f, "alloc {}", name),
-            Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
-            Expr::Return(e) => write!(f, "return {}", e.0),
-            Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
+            Expr_::Alloc(name) => write!(f, "alloc {}", name),
+            Expr_::Assign(name, e) => write!(f, "{} = {}", name, e.0),
+            Expr_::Return(e) => write!(f, "return {}", e.0),
+            Expr_::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
         }
     }
 }
 
-impl Expr {
+impl<TY> Expr_<TY> {
     pub fn number(n: i64) -> TypedExpr {
         (Expr::Number(n), Ty::Int)
     }
