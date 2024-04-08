@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use std::collections::HashSet;
 
 /// Create untyped HIR (i.e. contains Ty::Unknown) from AST
-pub fn create(ast: &ast::Program) -> Result<hir::Program> {
+pub fn create(ast: &ast::Program) -> Result<hir::Program_<()>> {
     let func_names = ast
         .iter()
         .map(|decl| match decl {
@@ -24,7 +24,7 @@ pub fn create(ast: &ast::Program) -> Result<hir::Program> {
             }
         }
     }
-    Ok(hir::Program { externs, funcs })
+    Ok(hir::Program_ { externs, funcs })
 }
 
 struct Compiler {
@@ -32,7 +32,7 @@ struct Compiler {
 }
 
 impl Compiler {
-    fn compile_func(&self, f: &ast::Function) -> Result<hir::Function> {
+    fn compile_func(&self, f: &ast::Function) -> Result<hir::Function_<()>> {
         let mut params = vec![];
         for p in &f.params {
             params.push(hir::Param {
@@ -41,10 +41,10 @@ impl Compiler {
             });
         }
         let mut lvars = HashSet::new();
-        Ok(hir::Function {
+        Ok(hir::Function_ {
             name: f.name.clone(),
             params,
-            ret_ty: compile_ty(&f.ret_ty)?,
+            ret_ty: (),
             body_stmts: f
                 .body_stmts
                 .iter()
@@ -58,14 +58,14 @@ impl Compiler {
         f: &ast::Function,
         lvars: &mut HashSet<String>,
         x: &ast::Expr,
-    ) -> Result<hir::TypedExpr> {
+    ) -> Result<hir::TypedExpr_<()>> {
         let e = match x {
-            ast::Expr::Number(i) => hir::Expr::Number(*i),
+            ast::Expr::Number(i) => hir::Expr_::Number(*i),
             ast::Expr::VarRef(name) => self.compile_var_ref(f, lvars, name)?,
             ast::Expr::OpCall(op, lhs, rhs) => {
                 let lhs = self.compile_expr(f, lvars, lhs)?;
                 let rhs = self.compile_expr(f, lvars, rhs)?;
-                hir::Expr::OpCall(op.clone(), Box::new(lhs), Box::new(rhs))
+                hir::Expr_::OpCall(op.clone(), Box::new(lhs), Box::new(rhs))
             }
             ast::Expr::FunCall(fexpr, args) => {
                 let fexpr = self.compile_expr(f, lvars, fexpr)?;
@@ -73,7 +73,7 @@ impl Compiler {
                 for a in args {
                     arg_hirs.push(self.compile_expr(f, lvars, a)?);
                 }
-                hir::Expr::FunCall(Box::new(fexpr), arg_hirs)
+                hir::Expr_::FunCall(Box::new(fexpr), arg_hirs)
             }
             ast::Expr::If(cond, then, els) => {
                 let cond = self.compile_expr(f, lvars, &cond)?;
@@ -84,38 +84,40 @@ impl Compiler {
                     vec![]
                 };
                 if ends_with_yield(&then) && ends_with_yield(&els) {
-                    hir::Expr::If(Box::new(cond), then, els)
+                    hir::Expr_::If(Box::new(cond), then, els)
                 } else if ends_with_yield(&then) || ends_with_yield(&els) {
                     return Err(anyhow!("yield must be in both (or neither) branches"));
                 } else {
-                    then.push(hir::Expr::yield_null());
-                    els.push(hir::Expr::yield_null());
-                    hir::Expr::If(Box::new(cond), then, els)
+                    let null = (hir::Expr_::PseudoVar(hir::PseudoVar::Null), ());
+                    let yield_null = (hir::Expr_::Yield(Box::new(null)), ());
+                    then.push(yield_null.clone());
+                    els.push(yield_null);
+                    hir::Expr_::If(Box::new(cond), then, els)
                 }
             }
             ast::Expr::Yield(v) => {
                 let e = self.compile_expr(f, lvars, v)?;
-                hir::Expr::Yield(Box::new(e))
+                hir::Expr_::Yield(Box::new(e))
             }
             ast::Expr::While(cond, body) => {
                 let cond = self.compile_expr(f, lvars, &cond)?;
                 let body = self.compile_exprs(f, lvars, &body)?;
-                hir::Expr::While(Box::new(cond), body)
+                hir::Expr_::While(Box::new(cond), body)
             }
             ast::Expr::Alloc(name) => {
                 lvars.insert(name.clone());
-                hir::Expr::Alloc(name.clone())
+                hir::Expr_::Alloc(name.clone())
             }
             ast::Expr::Assign(name, rhs) => {
                 let rhs = self.compile_expr(f, lvars, &rhs)?;
-                hir::Expr::Assign(name.clone(), Box::new(rhs))
+                hir::Expr_::Assign(name.clone(), Box::new(rhs))
             }
             ast::Expr::Return(v) => {
                 let e = self.compile_expr(f, lvars, v)?;
-                hir::Expr::Return(Box::new(e))
+                hir::Expr_::Return(Box::new(e))
             }
         };
-        Ok((e, hir::Ty::Unknown))
+        Ok((e, ()))
     }
 
     fn compile_var_ref(
@@ -123,19 +125,19 @@ impl Compiler {
         f: &ast::Function,
         lvars: &mut HashSet<String>,
         name: &str,
-    ) -> Result<hir::Expr> {
+    ) -> Result<hir::Expr_<()>> {
         let e = if lvars.contains(name) {
-            hir::Expr::LVarRef(name.to_string())
+            hir::Expr_::LVarRef(name.to_string())
         } else if let Some(idx) = f.params.iter().position(|p| p.name == name) {
-            hir::Expr::ArgRef(idx)
+            hir::Expr_::ArgRef(idx)
         } else if self.func_names.contains(name) {
-            hir::Expr::FuncRef(name.to_string())
+            hir::Expr_::FuncRef(name.to_string())
         } else if name == "true" {
-            hir::Expr::PseudoVar(hir::PseudoVar::True)
+            hir::Expr_::PseudoVar(hir::PseudoVar::True)
         } else if name == "false" {
-            hir::Expr::PseudoVar(hir::PseudoVar::False)
+            hir::Expr_::PseudoVar(hir::PseudoVar::False)
         } else if name == "null" {
-            hir::Expr::PseudoVar(hir::PseudoVar::Null)
+            hir::Expr_::PseudoVar(hir::PseudoVar::Null)
         } else {
             return Err(anyhow!("unknown variable: {name}"));
         };
@@ -147,7 +149,7 @@ impl Compiler {
         f: &ast::Function,
         lvars: &mut HashSet<String>,
         xs: &[ast::Expr],
-    ) -> Result<Vec<hir::TypedExpr>> {
+    ) -> Result<Vec<hir::TypedExpr_<()>>> {
         let mut es = vec![];
         for x in xs {
             es.push(self.compile_expr(f, lvars, x)?);
@@ -203,6 +205,6 @@ fn compile_fun_ty(x: &ast::FunTy) -> Result<hir::FunTy> {
     })
 }
 
-fn ends_with_yield(stmts: &[hir::TypedExpr]) -> bool {
-    matches!(stmts.last(), Some((hir::Expr::Yield(_), _)))
+fn ends_with_yield(stmts: &[hir::TypedExpr_<()>]) -> bool {
+    matches!(stmts.last(), Some((hir::Expr_::Yield(_), _)))
 }
