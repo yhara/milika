@@ -88,7 +88,7 @@ pub type Function = Function_<Ty>;
 pub struct Function_<TY> {
     pub name: String,
     pub params: Vec<Param>,
-    pub ret_ty: TY,
+    pub ret_ty: Ty,
     pub body_stmts: Vec<Typed<Expr_<TY>, TY>>,
 }
 
@@ -109,7 +109,7 @@ impl<TY: fmt::Display> fmt::Display for Function_<TY> {
 }
 
 impl<TY: Clone> Function_<TY> {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy_<TY> {
+    pub fn fun_ty(&self, is_async: bool) -> FunTy {
         FunTy_ {
             is_async,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
@@ -354,8 +354,13 @@ impl<TY> Expr_<TY> {
         (Expr::FuncRef(name.into()), fun_ty.into())
     }
 
-    pub fn op_call(op: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr, ty: Ty) -> TypedExpr {
-        (Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty)
+    pub fn op_call(op: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr) -> Result<TypedExpr> {
+        let ty = match &op[..] {
+            "+" | "-" | "*" | "/" => Ty::Int,
+            "<" | "<=" | ">" | ">=" | "==" | "!=" => Ty::Bool,
+            _ => return Err(anyhow!("[BUG] unknown operator: {op}")),
+        };
+        Ok((Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty))
     }
 
     pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>, result_ty: Ty) -> TypedExpr {

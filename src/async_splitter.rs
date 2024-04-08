@@ -171,7 +171,7 @@ impl AsyncSplitter {
             hir::Expr::OpCall(op, lhs, rhs) => {
                 let l = self.compile_expr(orig_func, *lhs)?;
                 let r = self.compile_expr(orig_func, *rhs)?;
-                hir::Expr::op_call(op, l, r, e.1)
+                hir::Expr::op_call(op, l, r)?
             }
             hir::Expr::FunCall(fexpr, arg_exprs) => {
                 let new_fexpr = self.compile_expr(orig_func, *fexpr)?;

@@ -46,9 +46,8 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
             bail!("parse error");
         }
     };
-    let mut hir = hir::untyped::create(&ast)?;
-    hir::typing::run(&mut hir)?;
-    //let hir = typing::run(ast)?;
+    let untyped_hir = hir::untyped::create(&ast)?;
+    let hir = hir::typing::run(untyped_hir)?;
     let hir = async_splitter::run(hir)?;
     Ok(hir)
 }
