@@ -14,10 +14,10 @@ fn main() -> Result<()> {
         bail!("usage: milika a.milika > a.mlir");
     };
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
-    let mut hir = compile(&src, &path)?;
+    let mut hir = compile(&src, &path, false)?;
 
     let prelude_txt = prelude::prelude_funcs(main_is_async(&hir)?);
-    let mut prelude_hir = compile(&prelude_txt, "src/prelude.rs")?;
+    let mut prelude_hir = compile(&prelude_txt, "src/prelude.rs", true)?;
     for e in prelude_hir.externs {
         if !e.is_internal {
             hir.externs.push(e);
@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn compile(src: &str, path: &str) -> Result<hir::Program> {
+fn compile(src: &str, path: &str, skip_async_lowering: bool) -> Result<hir::Program> {
     let ast = match parser::parse(src) {
         Ok(ast) => ast,
         Err(e) => {
@@ -48,7 +48,10 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
     };
     let mut hir = hir::untyped::create(&ast)?;
     hir::typing::run(&mut hir)?;
-    let hir = hir_lowering::async_splitter::run(hir)?;
+    if !skip_async_lowering {
+        hir::asyncness_check::run(&mut hir);
+        hir = hir_lowering::async_splitter::run(hir)?;
+    }
     Ok(hir)
 }
 
