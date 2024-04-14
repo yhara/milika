@@ -65,7 +65,10 @@ impl AsyncSplitter {
             self.chapters.back_mut().unwrap().stmts.push(new_expr);
         }
 
-        if self.chapters.len() == 1 {
+        if f.is_async.unwrap() {
+            let chaps = self.chapters.drain(..).collect();
+            self._generate_split_funcs(f, chaps)
+        } else {
             // Has no async call; no modification needed
             Ok(vec![hir::Function {
                 is_async: None,
@@ -74,9 +77,6 @@ impl AsyncSplitter {
                 ret_ty: f.ret_ty.into(),
                 body_stmts: self.chapters.pop_front().unwrap().stmts,
             }])
-        } else {
-            let chaps = self.chapters.drain(..).collect();
-            self._generate_split_funcs(f, chaps)
         }
     }
 

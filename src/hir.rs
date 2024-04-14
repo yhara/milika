@@ -1,6 +1,7 @@
 pub mod asyncness_check;
 pub mod typing;
 pub mod untyped;
+pub mod visitor;
 use crate::ast;
 use anyhow::{anyhow, Result};
 use std::fmt;
