@@ -68,6 +68,7 @@ impl AsyncSplitter {
         if self.chapters.len() == 1 {
             // Has no async call; no modification needed
             Ok(vec![hir::Function {
+                is_async: None,
                 name: f.name,
                 params: f.params.into_iter().map(|x| x.into()).collect(),
                 ret_ty: f.ret_ty.into(),
@@ -93,6 +94,7 @@ impl AsyncSplitter {
             let new_func = if i == 0 {
                 // Entry point function has the same name as the original.
                 hir::Function {
+                    is_async: None,
                     name: orig_func.name.clone(),
                     // It takes `$env` and `$cont` before the original params
                     params: prepend_async_params(
@@ -109,6 +111,7 @@ impl AsyncSplitter {
             } else {
                 // The rest of the functions have a name like `foo_1`, `foo_2`, ...
                 hir::Function {
+                    is_async: None,
                     name: chapter_func_name(&orig_func.name, i),
                     params: vec![
                         hir::Param::new(hir::Ty::ChiikaEnv, "$env"),

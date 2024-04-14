@@ -1,3 +1,4 @@
+pub mod asyncness_check;
 pub mod typing;
 pub mod untyped;
 use crate::ast;
@@ -82,6 +83,7 @@ impl fmt::Display for Extern {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub is_async: Option<bool>, // None means "unknown" or "N/A" depending on the phase
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
