@@ -1,7 +1,7 @@
 mod ast;
-mod async_splitter;
 mod compiler;
 mod hir;
+mod hir_lowering;
 mod parser;
 mod prelude;
 mod verifier;
@@ -48,8 +48,7 @@ fn compile(src: &str, path: &str) -> Result<hir::Program> {
     };
     let mut hir = hir::untyped::create(&ast)?;
     hir::typing::run(&mut hir)?;
-    //let hir = typing::run(ast)?;
-    let hir = async_splitter::run(hir)?;
+    let hir = hir_lowering::async_splitter::run(hir)?;
     Ok(hir)
 }
 
