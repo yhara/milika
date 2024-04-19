@@ -50,6 +50,7 @@ fn compile(src: &str, path: &str, skip_async_lowering: bool) -> Result<hir::Prog
     hir::typing::run(&mut hir)?;
     if !skip_async_lowering {
         hir::asyncness_check::run(&mut hir);
+        hir = hir_lowering::lower_async_if::run(hir)?;
         hir = hir_lowering::async_splitter::run(hir)?;
     }
     Ok(hir)

@@ -337,6 +337,18 @@ impl Expr {
         (Expr::Number(n), Ty::Int)
     }
 
+    //pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
+    //    let t = match pv {
+    //        PseudoVar::True | PseudoVar::False => Ty::Bool,
+    //        PseudoVar::Null => Ty::Null,
+    //    };
+    //    (Expr::PseudoVar(pv), t)
+    //}
+
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
+    }
+
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
         (Expr::ArgRef(idx), ty)
     }
@@ -377,6 +389,13 @@ impl Expr {
     pub fn yield_null() -> TypedExpr {
         let null = (Expr::PseudoVar(PseudoVar::Null), Ty::Null);
         (Expr::Yield(Box::new(null)), Ty::Null)
+    }
+
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> Result<TypedExpr> {
+        if cond.1 != Ty::Bool {
+            return Err(anyhow!("[BUG] while cond not bool: {:?}", cond));
+        }
+        Ok((Expr::While(Box::new(cond), body), Ty::Null))
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
