@@ -27,42 +27,42 @@ pub trait HirVisitor {
             hir::Expr::ArgRef(_) => {}
             hir::Expr::FuncRef(_) => {}
             hir::Expr::OpCall(_, lhs, rhs) => {
-                self.visit_expr(lhs)?;
-                self.visit_expr(rhs)?;
+                self.walk_expr(lhs)?;
+                self.walk_expr(rhs)?;
             }
             hir::Expr::FunCall(fexpr, arg_exprs) => {
-                self.visit_expr(fexpr)?;
+                self.walk_expr(fexpr)?;
                 for arg in arg_exprs {
-                    self.visit_expr(arg)?;
+                    self.walk_expr(arg)?;
                 }
             }
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
-                self.visit_expr(cond_expr)?;
+                self.walk_expr(cond_expr)?;
                 for expr in then_exprs {
-                    self.visit_expr(expr)?;
+                    self.walk_expr(expr)?;
                 }
                 for expr in else_exprs {
-                    self.visit_expr(expr)?;
+                    self.walk_expr(expr)?;
                 }
             }
             hir::Expr::Yield(expr) => {
-                self.visit_expr(expr)?;
+                self.walk_expr(expr)?;
             }
             hir::Expr::While(cond_expr, body_exprs) => {
-                self.visit_expr(cond_expr)?;
+                self.walk_expr(cond_expr)?;
                 for expr in body_exprs {
-                    self.visit_expr(expr)?;
+                    self.walk_expr(expr)?;
                 }
             }
             hir::Expr::Alloc(_) => {}
             hir::Expr::Assign(_, rhs) => {
-                self.visit_expr(rhs)?;
+                self.walk_expr(rhs)?;
             }
             hir::Expr::Return(expr) => {
-                self.visit_expr(expr)?;
+                self.walk_expr(expr)?;
             }
             hir::Expr::Cast(_, expr) => {
-                self.visit_expr(expr)?;
+                self.walk_expr(expr)?;
             }
         }
         self.visit_expr(expr)?;
