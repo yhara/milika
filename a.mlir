@@ -9,18 +9,31 @@ module {
   func.func @chiika_main() -> i64 {
     %true = arith.constant true
     %0 = scf.if %true -> (i64) {
-      %f = func.constant @print : (i64) -> i64
-      %c456_i64 = arith.constant 456 : i64
-      %1 = func.call_indirect %f(%c456_i64) : (i64) -> i64
-      %c0_i64_0 = arith.constant 0 : i64
-      scf.yield %c0_i64_0 : i64
+      %f = func.constant @"chiika_main't" : () -> i64
+      %1 = func.call_indirect %f() : () -> i64
+      scf.yield %1 : i64
     } else {
-      %f = func.constant @print : (i64) -> i64
-      %c789_i64 = arith.constant 789 : i64
-      %1 = func.call_indirect %f(%c789_i64) : (i64) -> i64
-      %c0_i64_0 = arith.constant 0 : i64
-      scf.yield %c0_i64_0 : i64
+      %f = func.constant @"chiika_main'f" : () -> i64
+      %1 = func.call_indirect %f() : () -> i64
+      scf.yield %1 : i64
     }
+    return %0 : i64
+  }
+  func.func @"chiika_main't"() -> i64 {
+    %f = constant @"chiika_main'e" : (i64) -> i64
+    %c456_i64 = arith.constant 456 : i64
+    %0 = call_indirect %f(%c456_i64) : (i64) -> i64
+    return %0 : i64
+  }
+  func.func @"chiika_main'f"() -> i64 {
+    %f = constant @"chiika_main'e" : (i64) -> i64
+    %c789_i64 = arith.constant 789 : i64
+    %0 = call_indirect %f(%c789_i64) : (i64) -> i64
+    return %0 : i64
+  }
+  func.func @"chiika_main'e"(%arg0: i64) -> i64 {
+    %f = constant @print : (i64) -> i64
+    %0 = call_indirect %f(%arg0) : (i64) -> i64
     %c0_i64 = arith.constant 0 : i64
     return %c0_i64 : i64
   }

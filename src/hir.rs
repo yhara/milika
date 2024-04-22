@@ -304,15 +304,15 @@ impl std::fmt::Display for Expr {
             Expr::If(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
-                    write!(f, "  {}\n", stmt.0)?;
+                    write!(f, "    {}\n", stmt.0)?;
                 }
-                write!(f, "}}")?;
+                write!(f, "  }}")?;
                 if !else_.is_empty() {
                     write!(f, " else {{\n")?;
                     for stmt in else_ {
-                        write!(f, "  {}\n", stmt.0)?;
+                        write!(f, "    {}\n", stmt.0)?;
                     }
-                    write!(f, "}}")?;
+                    write!(f, "  }}")?;
                 }
                 Ok(())
             }
@@ -335,6 +335,18 @@ impl std::fmt::Display for Expr {
 impl Expr {
     pub fn number(n: i64) -> TypedExpr {
         (Expr::Number(n), Ty::Int)
+    }
+
+    //pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
+    //    let t = match pv {
+    //        PseudoVar::True | PseudoVar::False => Ty::Bool,
+    //        PseudoVar::Null => Ty::Null,
+    //    };
+    //    (Expr::PseudoVar(pv), t)
+    //}
+
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
     }
 
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
@@ -377,6 +389,13 @@ impl Expr {
     pub fn yield_null() -> TypedExpr {
         let null = (Expr::PseudoVar(PseudoVar::Null), Ty::Null);
         (Expr::Yield(Box::new(null)), Ty::Null)
+    }
+
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> Result<TypedExpr> {
+        if cond.1 != Ty::Bool {
+            return Err(anyhow!("[BUG] while cond not bool: {:?}", cond));
+        }
+        Ok((Expr::While(Box::new(cond), body), Ty::Null))
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {

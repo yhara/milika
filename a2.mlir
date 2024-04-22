@@ -9,22 +9,35 @@ module attributes {llvm.data_layout = ""} {
     %0 = llvm.mlir.constant(true) : i1
     llvm.cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %1 = llvm.mlir.addressof @print : !llvm.ptr
-    %2 = llvm.mlir.constant(456 : i64) : i64
-    %3 = llvm.call %1(%2) : !llvm.ptr, (i64) -> i64
-    %4 = llvm.mlir.constant(0 : i64) : i64
-    llvm.br ^bb3(%4 : i64)
+    %1 = llvm.mlir.addressof @"chiika_main't" : !llvm.ptr
+    %2 = llvm.call %1() : !llvm.ptr, () -> i64
+    llvm.br ^bb3(%2 : i64)
   ^bb2:  // pred: ^bb0
-    %5 = llvm.mlir.addressof @print : !llvm.ptr
-    %6 = llvm.mlir.constant(789 : i64) : i64
-    %7 = llvm.call %5(%6) : !llvm.ptr, (i64) -> i64
-    %8 = llvm.mlir.constant(0 : i64) : i64
-    llvm.br ^bb3(%8 : i64)
-  ^bb3(%9: i64):  // 2 preds: ^bb1, ^bb2
+    %3 = llvm.mlir.addressof @"chiika_main'f" : !llvm.ptr
+    %4 = llvm.call %3() : !llvm.ptr, () -> i64
+    llvm.br ^bb3(%4 : i64)
+  ^bb3(%5: i64):  // 2 preds: ^bb1, ^bb2
     llvm.br ^bb4
   ^bb4:  // pred: ^bb3
-    %10 = llvm.mlir.constant(0 : i64) : i64
-    llvm.return %10 : i64
+    llvm.return %5 : i64
+  }
+  llvm.func @"chiika_main't"() -> i64 {
+    %0 = llvm.mlir.addressof @"chiika_main'e" : !llvm.ptr
+    %1 = llvm.mlir.constant(456 : i64) : i64
+    %2 = llvm.call %0(%1) : !llvm.ptr, (i64) -> i64
+    llvm.return %2 : i64
+  }
+  llvm.func @"chiika_main'f"() -> i64 {
+    %0 = llvm.mlir.addressof @"chiika_main'e" : !llvm.ptr
+    %1 = llvm.mlir.constant(789 : i64) : i64
+    %2 = llvm.call %0(%1) : !llvm.ptr, (i64) -> i64
+    llvm.return %2 : i64
+  }
+  llvm.func @"chiika_main'e"(%arg0: i64) -> i64 {
+    %0 = llvm.mlir.addressof @print : !llvm.ptr
+    %1 = llvm.call %0(%arg0) : !llvm.ptr, (i64) -> i64
+    %2 = llvm.mlir.constant(0 : i64) : i64
+    llvm.return %2 : i64
   }
   llvm.func @chiika_start_user(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
     %0 = llvm.mlir.addressof @chiika_main : !llvm.ptr

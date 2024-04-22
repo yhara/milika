@@ -21,18 +21,33 @@ define i64 @chiika_main() {
   br i1 true, label %1, label %3
 
 1:                                                ; preds = %0
-  %2 = call i64 @print(i64 456)
+  %2 = call i64 @"chiika_main't"()
   br label %5
 
 3:                                                ; preds = %0
-  %4 = call i64 @print(i64 789)
+  %4 = call i64 @"chiika_main'f"()
   br label %5
 
 5:                                                ; preds = %1, %3
-  %6 = phi i64 [ 0, %3 ], [ 0, %1 ]
+  %6 = phi i64 [ %4, %3 ], [ %2, %1 ]
   br label %7
 
 7:                                                ; preds = %5
+  ret i64 %6
+}
+
+define i64 @"chiika_main't"() {
+  %1 = call i64 @"chiika_main'e"(i64 456)
+  ret i64 %1
+}
+
+define i64 @"chiika_main'f"() {
+  %1 = call i64 @"chiika_main'e"(i64 789)
+  ret i64 %1
+}
+
+define i64 @"chiika_main'e"(i64 %0) {
+  %2 = call i64 @print(i64 %0)
   ret i64 0
 }
 
