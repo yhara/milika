@@ -223,7 +223,7 @@ impl Ty {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FunTy {
     pub asyncness: Asyncness,
     pub param_tys: Vec<Ty>,
@@ -238,7 +238,13 @@ impl fmt::Display for FunTy {
             .map(|p| p.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        write!(f, "FN(({})->{})", para, &self.ret_ty)
+        write!(f, "({})->{}", para, &self.ret_ty)
+    }
+}
+
+impl fmt::Debug for FunTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
