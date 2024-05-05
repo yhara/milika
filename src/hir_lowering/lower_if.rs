@@ -58,11 +58,17 @@ impl HirRewriter for Compiler {
                 let id = self.blocks.len() - 1;
                 self.push(hir::Expr::cond_br(*cond, id + 1, id + 2));
 
-                then_exprs.push(hir::Expr::br(id + 3));
+                let hir::Expr::Yield(v) = then_exprs.pop().unwrap().0 else {
+                    panic!("expected yield");
+                };
+                then_exprs.push(hir::Expr::br(*v, id + 3));
                 let then_block = blocked::Block::new(vec![], then_exprs);
                 self.blocks.push(then_block);
 
-                else_exprs.push(hir::Expr::br(id + 3));
+                let hir::Expr::Yield(v) = else_exprs.pop().unwrap().0 else {
+                    panic!("expected yield");
+                };
+                else_exprs.push(hir::Expr::br(*v, id + 3));
                 let else_block = blocked::Block::new(vec![], else_exprs);
                 self.blocks.push(else_block);
 
