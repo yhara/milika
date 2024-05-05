@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 pub fn run(hir: &hir::blocked::Program) -> Result<()> {
     for f in &hir.funcs {
         for b in &f.body_blocks {
-            for e in b {
+            for e in &b.stmts {
                 verify_expr(f, e)?;
             }
         }
@@ -86,6 +86,21 @@ fn _verify_expr(f: &hir::blocked::Function, e: &hir::TypedExpr) -> Result<()> {
                 }
             }
         }
+        hir::Expr::Br(n) => {
+            if *n >= f.body_blocks.len() {
+                bail!("block index out of range: {}", n);
+            }
+        }
+        hir::Expr::CondBr(cond, then, els) => {
+            verify_expr(f, cond)?;
+            if *then >= f.body_blocks.len() {
+                bail!("block index out of range: {}", then);
+            }
+            if *els >= f.body_blocks.len() {
+                bail!("block index out of range: {}", els);
+            }
+        }
+        hir::Expr::BlockArgRef => (),
     }
     Ok(())
 }

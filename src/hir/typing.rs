@@ -146,6 +146,7 @@ impl<'f> Typing<'f> {
             hir::Expr::Cast(_, _) => {
                 return Err(anyhow!("[BUG] Cast unexpected here"));
             }
+            _ => panic!("must not occur in hir::typing"),
         };
         Ok(())
     }

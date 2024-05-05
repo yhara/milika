@@ -217,6 +217,7 @@ impl AsyncSplitter {
                     "[BUG] cast should not appear before async_splitter"
                 ))
             }
+            _ => todo!(),
         };
         Ok(new_e)
     }

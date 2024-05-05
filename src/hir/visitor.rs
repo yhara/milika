@@ -64,6 +64,11 @@ pub trait HirVisitor {
             hir::Expr::Cast(_, expr) => {
                 self.walk_expr(expr)?;
             }
+            hir::Expr::Br(_) => {}
+            hir::Expr::CondBr(expr, _, _) => {
+                self.walk_expr(expr)?;
+            }
+            hir::Expr::BlockArgRef => {}
         }
         self.visit_expr(expr)?;
         Ok(())
