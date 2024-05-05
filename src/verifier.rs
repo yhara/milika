@@ -2,23 +2,25 @@ use crate::hir;
 use anyhow::{bail, Context, Result};
 
 /// Check type consistency of the HIR to detect bugs in the compiler.
-pub fn run(hir: &hir::Program) -> Result<()> {
+pub fn run(hir: &hir::blocked::Program) -> Result<()> {
     for f in &hir.funcs {
-        for e in &f.body_stmts {
-            verify_expr(f, e)?;
+        for b in &f.body_blocks {
+            for e in b {
+                verify_expr(f, e)?;
+            }
         }
     }
     Ok(())
 }
 
-fn verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
+fn verify_expr(f: &hir::blocked::Function, e: &hir::TypedExpr) -> Result<()> {
     _verify_expr(f, e)
         .context(format!("in expr {:?}", e.0))
         .context(format!("in function {:?}", f.name))
         .context(format!("[BUG] Type verifier failed"))
 }
 
-fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
+fn _verify_expr(f: &hir::blocked::Function, e: &hir::TypedExpr) -> Result<()> {
     match &e.0 {
         hir::Expr::Number(_) => assert(&e.1, &hir::Ty::Int)?,
         hir::Expr::PseudoVar(_) => (),
@@ -88,7 +90,7 @@ fn _verify_expr(f: &hir::Function, e: &hir::TypedExpr) -> Result<()> {
     Ok(())
 }
 
-fn verify_exprs(f: &hir::Function, es: &[hir::TypedExpr]) -> Result<()> {
+fn verify_exprs(f: &hir::blocked::Function, es: &[hir::TypedExpr]) -> Result<()> {
     for e in es {
         verify_expr(f, e)?;
     }
