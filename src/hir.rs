@@ -337,6 +337,18 @@ impl Expr {
         (Expr::Number(n), Ty::Int)
     }
 
+    //pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
+    //    let t = match pv {
+    //        PseudoVar::True | PseudoVar::False => Ty::Bool,
+    //        PseudoVar::Null => Ty::Null,
+    //    };
+    //    (Expr::PseudoVar(pv), t)
+    //}
+
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
+    }
+
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
         (Expr::ArgRef(idx), ty)
     }
@@ -345,28 +357,34 @@ impl Expr {
         (Expr::FuncRef(name.into()), fun_ty.into())
     }
 
-    pub fn op_call(op: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr, ty: Ty) -> TypedExpr {
-        (Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty)
+    pub fn op_call(op_: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr) -> TypedExpr {
+        let op = op_.into();
+        let ty = match &op[..] {
+            "+" | "-" | "*" | "/" => Ty::Int,
+            "<" | "<=" | ">" | ">=" | "==" | "!=" => Ty::Bool,
+            _ => panic!("[BUG] unknown operator: {op}"),
+        };
+        (Expr::OpCall(op, Box::new(lhs), Box::new(rhs)), ty)
     }
 
-    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>, result_ty: Ty) -> TypedExpr {
+    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
+        let result_ty = match &func.1 {
+            Ty::Fun(f) => *f.ret_ty.clone(),
+            _ => panic!("[BUG] not a function: {:?}", func),
+        };
         (Expr::FunCall(Box::new(func), args), result_ty)
     }
 
-    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> Result<TypedExpr> {
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
         if cond.1 != Ty::Bool {
-            return Err(anyhow!("[BUG] if cond not bool: {:?}", cond));
+            panic!("[BUG] if cond not bool: {:?}", cond);
         }
         let t1 = yielded_ty(&then);
         let t2 = yielded_ty(&else_);
         if t1 != t2 || t1.is_none() || t2.is_none() {
-            return Err(anyhow!(
-                "[BUG] if type invalid (t1: {:?}, t2: {:?})",
-                t1,
-                t2
-            ));
+            panic!("[BUG] if type invalid (t1: {:?}, t2: {:?})", t1, t2);
         }
-        Ok((Expr::If(Box::new(cond), then, else_), t1.unwrap()))
+        (Expr::If(Box::new(cond), then, else_), t1.unwrap())
     }
 
     pub fn yield_(expr: TypedExpr) -> TypedExpr {
@@ -379,6 +397,13 @@ impl Expr {
         (Expr::Yield(Box::new(null)), Ty::Null)
     }
 
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> TypedExpr {
+        if cond.1 != Ty::Bool {
+            panic!("[BUG] while cond not bool: {:?}", cond);
+        }
+        (Expr::While(Box::new(cond), body), Ty::Null)
+    }
+
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
         (Expr::Assign(name.into(), Box::new(e)), Ty::Void)
     }
@@ -387,7 +412,13 @@ impl Expr {
         (Expr::Return(Box::new(e)), Ty::Void)
     }
 
-    pub fn cast(e: TypedExpr, cast_type: CastType, ty: Ty) -> TypedExpr {
+    pub fn cast(cast_type: CastType, e: TypedExpr) -> TypedExpr {
+        let ty = match &cast_type {
+            CastType::AnyToFun(f) => f.clone().into(),
+            CastType::AnyToInt => Ty::Int,
+            CastType::IntToAny => Ty::Any,
+            CastType::FunToAny => Ty::Any,
+        };
         (Expr::Cast(cast_type, Box::new(e)), ty)
     }
 }

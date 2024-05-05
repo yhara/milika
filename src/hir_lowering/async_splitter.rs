@@ -166,7 +166,6 @@ impl AsyncSplitter {
                     hir::Expr::fun_call(
                         func_ref_env_ref(),
                         vec![arg_ref_env(), hir::Expr::number(idx as i64)],
-                        e.1,
                     )
                 }
             }
@@ -174,7 +173,7 @@ impl AsyncSplitter {
             hir::Expr::OpCall(op, lhs, rhs) => {
                 let l = self.compile_expr(orig_func, *lhs)?;
                 let r = self.compile_expr(orig_func, *rhs)?;
-                hir::Expr::op_call(op, l, r, e.1)
+                hir::Expr::op_call(op, l, r)
             }
             hir::Expr::FunCall(fexpr, arg_exprs) => {
                 let new_fexpr = self.compile_expr(orig_func, *fexpr)?;
@@ -188,7 +187,7 @@ impl AsyncSplitter {
                 if fun_ty.is_async {
                     self.compile_async_call(orig_func, new_fexpr, new_args)?
                 } else {
-                    hir::Expr::fun_call(new_fexpr, new_args, e.1)
+                    hir::Expr::fun_call(new_fexpr, new_args)
                 }
             }
             hir::Expr::Assign(name, rhs) => {
@@ -204,7 +203,7 @@ impl AsyncSplitter {
                     .into_iter()
                     .map(|e| self.compile_expr(orig_func, e))
                     .collect::<Result<Vec<_>>>()?;
-                hir::Expr::if_(new_cond, new_then, new_else)?
+                hir::Expr::if_(new_cond, new_then, new_else)
             }
             hir::Expr::Yield(expr) => {
                 let new_expr = self.compile_expr(orig_func, *expr)?;
@@ -254,7 +253,6 @@ impl AsyncSplitter {
             .push(hir::Expr::return_(hir::Expr::fun_call(
                 (fexpr.0, async_fun_ty(fun_ty).into()),
                 new_args,
-                hir::Ty::RustFuture,
             )));
         last_chapter.async_result_ty = Some(async_result_ty.clone());
         self.chapters.push_back(Chapter::new());
@@ -339,7 +337,6 @@ fn append_async_outro(
     stmts.push(hir::Expr::return_(hir::Expr::fun_call(
         cont,
         vec![arg_ref_env(), *ret_val],
-        hir::Ty::RustFuture,
     )));
     stmts
 }
@@ -385,13 +382,11 @@ fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr
         _ => panic!("[BUG] cannot cast: {:?}", popped_value_ty),
     };
     hir::Expr::cast(
+        cast_type,
         hir::Expr::fun_call(
             env_pop,
             vec![arg_ref_env(), hir::Expr::number(n_pop as i64)],
-            hir::Ty::Any,
         ),
-        cast_type,
-        popped_value_ty,
     )
 }
 
@@ -402,7 +397,7 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
             hir::Ty::Fun(_) => hir::CastType::FunToAny,
             _ => panic!("[BUG] cannot cast: {:?}", val.1),
         };
-        hir::Expr::cast(val, cast_type, hir::Ty::Any)
+        hir::Expr::cast(cast_type, val)
     };
     let fun_ty = hir::FunTy {
         is_async: false,
@@ -412,7 +407,6 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
     hir::Expr::fun_call(
         hir::Expr::func_ref("chiika_env_push", fun_ty),
         vec![arg_ref_env(), cast_val],
-        hir::Ty::Int,
     )
 }
 
