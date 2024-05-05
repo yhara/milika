@@ -1,4 +1,6 @@
 pub mod asyncness_check;
+pub mod blocked;
+pub mod rewriter;
 pub mod typing;
 pub mod untyped;
 pub mod visitor;
@@ -263,6 +265,10 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
+    // Appears after `lower_if`
+    Br(usize),
+    CondBr(Box<Typed<Expr>>, usize, usize),
+    BlockArgRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -420,6 +426,18 @@ impl Expr {
             CastType::FunToAny => Ty::Any,
         };
         (Expr::Cast(cast_type, Box::new(e)), ty)
+    }
+
+    pub fn br(target: usize) -> TypedExpr {
+        (Expr::Br(target), Ty::Void)
+    }
+
+    pub fn cond_br(cond: TypedExpr, target_t: usize, target_f: usize) -> TypedExpr {
+        (Expr::CondBr(Box::new(cond), target_t, target_f), Ty::Void)
+    }
+
+    pub fn block_arg_ref(ty: Ty) -> TypedExpr {
+        (Expr::BlockArgRef, ty)
     }
 }
 
