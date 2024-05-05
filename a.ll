@@ -7,7 +7,7 @@ declare void @free(ptr)
 
 declare i64 @print(i64)
 
-declare ptr @sleep_sec(ptr, ptr, i64)
+declare i64 @sleep_sec(i64)
 
 declare i64 @chiika_env_push(ptr, ptr)
 
@@ -30,9 +30,6 @@ define i64 @chiika_main() {
 
 5:                                                ; preds = %1, %3
   %6 = phi i64 [ 0, %3 ], [ 0, %1 ]
-  br label %7
-
-7:                                                ; preds = %5
   ret i64 0
 }
 

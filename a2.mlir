@@ -1,6 +1,6 @@
 module attributes {llvm.data_layout = ""} {
   llvm.func @print(i64) -> i64 attributes {sym_visibility = "private"}
-  llvm.func @sleep_sec(!llvm.ptr, !llvm.ptr, i64) -> !llvm.ptr attributes {sym_visibility = "private"}
+  llvm.func @sleep_sec(i64) -> i64 attributes {sym_visibility = "private"}
   llvm.func @chiika_env_push(!llvm.ptr, !llvm.ptr) -> i64 attributes {sym_visibility = "private"}
   llvm.func @chiika_env_pop(!llvm.ptr, i64) -> !llvm.ptr attributes {sym_visibility = "private"}
   llvm.func @chiika_env_ref(!llvm.ptr, i64) -> i64 attributes {sym_visibility = "private"}
@@ -21,8 +21,6 @@ module attributes {llvm.data_layout = ""} {
     %8 = llvm.mlir.constant(0 : i64) : i64
     llvm.br ^bb3(%8 : i64)
   ^bb3(%9: i64):  // 2 preds: ^bb1, ^bb2
-    llvm.br ^bb4
-  ^bb4:  // pred: ^bb3
     %10 = llvm.mlir.constant(0 : i64) : i64
     llvm.return %10 : i64
   }
