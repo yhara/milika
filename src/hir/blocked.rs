@@ -1,7 +1,24 @@
 use crate::hir;
 use std::fmt;
 
-pub type Block = Vec<hir::Typed<hir::Expr>>;
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub param_tys: Vec<hir::Ty>,
+    pub stmts: Vec<hir::Typed<hir::Expr>>,
+}
+
+impl Block {
+    pub fn new_empty(param_tys: Vec<hir::Ty>) -> Self {
+        Block {
+            param_tys,
+            stmts: vec![],
+        }
+    }
+
+    pub fn new(param_tys: Vec<hir::Ty>, stmts: Vec<hir::Typed<hir::Expr>>) -> Self {
+        Block { param_tys, stmts }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -39,12 +56,28 @@ impl fmt::Display for Function {
             .collect::<Vec<_>>()
             .join(", ");
         write!(f, "fun {}({}) -> {} {{\n", self.name, para, self.ret_ty)?;
-        for block in &self.body_blocks {
-            write!(f, "^bb()\n")?;
-            for expr in block {
+        for (i, block) in self.body_blocks.iter().enumerate() {
+            let para = block
+                .param_tys
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            write!(f, "^bb{i}({para})\n")?;
+            for expr in &block.stmts {
                 write!(f, "  {};  #-> {}\n", &expr.0, &expr.1)?;
             }
         }
         write!(f, "}}\n")
+    }
+}
+
+impl Function {
+    pub fn fun_ty(&self, is_async: bool) -> hir::FunTy {
+        hir::FunTy {
+            is_async,
+            param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
+            ret_ty: Box::new(self.ret_ty.clone()),
+        }
     }
 }

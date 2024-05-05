@@ -8,7 +8,7 @@ pub fn run(program: hir::Program) -> blocked::Program {
         .funcs
         .into_iter()
         .map(|f| {
-            let c = Compiler::new();
+            let mut c = Compiler::new(&f);
             c.compile_func(f.body_stmts);
             blocked::Function {
                 is_async: f.is_async,
@@ -30,14 +30,15 @@ struct Compiler {
 }
 
 impl Compiler {
-    fn new() -> Self {
-        let block = vec![];
+    fn new(f: &hir::Function) -> Self {
+        let first_block =
+            blocked::Block::new_empty(f.params.iter().map(|p| p.ty.clone()).collect());
         Compiler {
-            blocks: vec![block],
+            blocks: vec![first_block],
         }
     }
 
-    fn compile_func(&self, body_stmts: Vec<hir::TypedExpr>) {
+    fn compile_func(&mut self, body_stmts: Vec<hir::TypedExpr>) {
         let new_stmts = self.walk_exprs(body_stmts).unwrap();
         for e in new_stmts {
             self.push(e);
@@ -45,22 +46,27 @@ impl Compiler {
     }
 
     fn push(&mut self, e: hir::TypedExpr) {
-        self.blocks.last_mut().unwrap().push(e);
+        self.blocks.last_mut().unwrap().stmts.push(e);
     }
 }
 
 impl HirRewriter for Compiler {
     fn rewrite_expr(&mut self, e: hir::TypedExpr) -> Result<hir::TypedExpr> {
         match e.0 {
-            hir::Expr::If(cond, mut then_block, mut else_block) => {
+            hir::Expr::If(cond, mut then_exprs, mut else_exprs) => {
                 let if_ty = e.1;
                 let id = self.blocks.len() - 1;
                 self.push(hir::Expr::cond_br(*cond, id + 1, id + 2));
-                then_block.push(hir::Expr::br(id + 2));
+
+                then_exprs.push(hir::Expr::br(id + 2));
+                let then_block = blocked::Block::new(vec![], then_exprs);
                 self.blocks.push(then_block);
-                else_block.push(hir::Expr::br(id + 2));
-                self.blocks.push(then_block);
-                let endif_block = vec![];
+
+                else_exprs.push(hir::Expr::br(id + 2));
+                let else_block = blocked::Block::new(vec![], else_exprs);
+                self.blocks.push(else_block);
+
+                let endif_block = blocked::Block::new_empty(vec![if_ty.clone()]);
                 self.blocks.push(endif_block);
                 Ok(hir::Expr::block_arg_ref(if_ty))
             }
