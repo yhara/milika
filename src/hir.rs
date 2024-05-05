@@ -334,6 +334,11 @@ impl std::fmt::Display for Expr {
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}", e.0),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
+            Expr::Br(target) => write!(f, "%br ^bb{}", target),
+            Expr::CondBr(cond, target_t, target_f) => {
+                write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
+            }
+            Expr::BlockArgRef => write!(f, "%block_arg"),
         }
     }
 }
