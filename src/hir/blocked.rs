@@ -57,13 +57,15 @@ impl fmt::Display for Function {
             .join(", ");
         write!(f, "fun {}({}) -> {} {{\n", self.name, para, self.ret_ty)?;
         for (i, block) in self.body_blocks.iter().enumerate() {
-            let para = block
-                .param_tys
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            write!(f, "^bb{i}({para})\n")?;
+            if i != 0 {
+                let para = block
+                    .param_tys
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "^bb{i}({para})\n")?;
+            }
             for expr in &block.stmts {
                 write!(f, "  {};  #-> {}\n", &expr.0, &expr.1)?;
             }

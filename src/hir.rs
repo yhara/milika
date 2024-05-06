@@ -95,13 +95,22 @@ pub struct Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let func = match self.is_async {
+            Some(true) => "fun*",
+            Some(false) => "fun",
+            None => "func",
+        };
         let para = self
             .params
             .iter()
             .map(|p| p.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        write!(f, "fun {}({}) -> {} {{\n", self.name, para, self.ret_ty)?;
+        write!(
+            f,
+            "{} {}({}) -> {} {{\n",
+            func, self.name, para, self.ret_ty
+        )?;
         for expr in &self.body_stmts {
             write!(f, "  {};  #-> {}\n", &expr.0, &expr.1)?;
         }
