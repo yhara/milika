@@ -401,10 +401,11 @@ impl Expr {
         }
         let t1 = yielded_ty(&then);
         let t2 = yielded_ty(&else_);
-        if t1 != t2 || t1.is_none() || t2.is_none() {
-            panic!("[BUG] if type invalid (t1: {:?}, t2: {:?})", t1, t2);
+        if t1 != t2 {
+            panic!("[BUG] if types mismatch (t1: {:?}, t2: {:?})", t1, t2);
         }
-        (Expr::If(Box::new(cond), then, else_), t1.unwrap())
+
+        (Expr::If(Box::new(cond), then, else_), t1)
     }
 
     pub fn yield_(expr: TypedExpr) -> TypedExpr {
@@ -455,12 +456,10 @@ impl Expr {
     }
 }
 
-pub fn yielded_ty(stmts: &[TypedExpr]) -> Option<Ty> {
-    stmts
-        .last()
-        .map(|stmt| match &stmt.0 {
-            Expr::Yield(val) => Some(val.1.clone()),
-            _ => None,
-        })
-        .flatten()
+pub fn yielded_ty(stmts: &[TypedExpr]) -> Ty {
+    let stmt = stmts.last().unwrap();
+    match &stmt.0 {
+        Expr::Yield(val) => val.1.clone(),
+        _ => panic!("[BUG] if branch not terminated with yield: {:?}", stmt),
+    }
 }

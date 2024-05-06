@@ -102,8 +102,8 @@ impl<'f> Typing<'f> {
                 }
                 self.compile_exprs(lvars, then)?;
                 self.compile_exprs(lvars, els)?;
-                let t1 = hir::yielded_ty(&then).unwrap();
-                let t2 = hir::yielded_ty(&els).unwrap();
+                let t1 = hir::yielded_ty(&then);
+                let t2 = hir::yielded_ty(&els);
                 if t1 != t2 {
                     return Err(anyhow!(
                         "then and else should have the same type but got {:?} and {:?}",
