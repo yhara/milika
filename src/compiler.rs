@@ -201,7 +201,7 @@ impl<'c> Compiler<'c> {
             hir::Expr::CondBr(cond, true_block_id, false_block_id) => {
                 self.compile_cond_br(blocks, block, lvars, cond, true_block_id, false_block_id)
             }
-            hir::Expr::BlockArgRef => self.compile_block_arg_ref(block, &texpr.1),
+            hir::Expr::BlockArgRef => self.compile_block_arg_ref(block),
         }
     }
 
@@ -567,7 +567,6 @@ impl<'c> Compiler<'c> {
     fn compile_block_arg_ref<'a>(
         &self,
         block: &'a ir::Block<'c>,
-        ty: &hir::Ty,
     ) -> Result<Option<ir::Value<'c, 'a>>> {
         Ok(Some(block.argument(0).unwrap().into()))
     }
