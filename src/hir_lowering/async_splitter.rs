@@ -1,3 +1,20 @@
+//! Example
+//! ```
+//! // Before
+//! fun foo() -> Int {
+//!   print(sleep_sec(1));
+//!   return 42;
+//! }
+//! // After
+//! fun foo($env, $cont) -> RustFuture {
+//!   chiika_env_push($env, $cont);
+//!   return sleep_sec(foo_1, 1);
+//! }
+//! fun foo_1($env, $async_result) -> RustFuture {
+//!   print($async_result);
+//!   return chiika_env_pop($env)(42); // Call the original $cont
+//! }
+//! ```
 use crate::hir;
 use anyhow::{anyhow, Result};
 use std::collections::VecDeque;
