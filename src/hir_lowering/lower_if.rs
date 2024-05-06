@@ -1,3 +1,43 @@
+//! Converts if-else expressions to a sequence of blocks.
+//! Intended to use `cf.cond_br` rather than `scf.if` which (IIRC) cannot contain
+//! `func.return`.
+//!
+//! The branches must not contain async function calls (use lower_async_if to
+//! remove them first.)
+//!
+//! Example:
+//! ```
+//! // Before
+//! fun foo() {
+//!   ...
+//!   x = if (a) {
+//!     b ...
+//!     yield c
+//!   } else {
+//!     d ...
+//!     yield e
+//!   }
+//!   ...
+//!   x + ...
+//!
+//! // After
+//! fun foo() -> Foo {
+//!   ...
+//!     cond_br a, ^bb1(), ^bb2()
+//!
+//!   ^bb1():
+//!     b ...
+//!     br ^bb3(c)
+//!
+//!   ^bb2():
+//!     d ...
+//!     br ^bb3(e)
+//!
+//!   ^bb3(x):
+//!     ...
+//!     x + ...
+//! }
+//! ```
 use crate::hir;
 use crate::hir::blocked;
 use crate::hir::rewriter::HirRewriter;
