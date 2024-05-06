@@ -75,27 +75,27 @@ pub trait HirVisitor {
     }
 }
 
-//pub struct Allocs(Vec<(String, hir::Ty)>);
-//impl Allocs {
-//    /// Collects `alloc`ed variable names and their types.
-//    pub fn collect(body_stmts: &[hir::TypedExpr]) -> Result<Vec<(String, hir::Ty)>> {
-//        let mut a = Allocs(vec![]);
-//        a.walk_exprs(body_stmts)?;
-//        Ok(a.0)
-//    }
-//}
-//impl HirVisitor for Allocs {
-//    fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<()> {
-//        match texpr {
-//            (hir::Expr::Alloc(name), ty) => {
-//                self.0.push((name.clone(), ty.clone()));
-//            }
-//            _ => {}
-//        }
-//        Ok(())
-//    }
-//}
-//
+pub struct Allocs(Vec<(String, hir::Ty)>);
+impl Allocs {
+    /// Collects `alloc`ed variable names and their types.
+    pub fn collect(body_stmts: &[hir::TypedExpr]) -> Result<Vec<(String, hir::Ty)>> {
+        let mut a = Allocs(vec![]);
+        a.walk_exprs(body_stmts)?;
+        Ok(a.0)
+    }
+}
+impl HirVisitor for Allocs {
+    fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<()> {
+        match texpr {
+            (hir::Expr::Alloc(name), ty) => {
+                self.0.push((name.clone(), ty.clone()));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
 //pub struct NoAsyncTy(());
 //impl NoAsyncTy {
 //    /// Asserts that there is no `async` type in the program.
