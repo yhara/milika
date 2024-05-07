@@ -32,25 +32,33 @@ impl<'a> Check<'a> {
         c.walk_exprs(&f.body_stmts)?;
         Ok(c.result)
     }
+
+    fn check_fexpr(&mut self, fexpr: &hir::TypedExpr) {
+        match fexpr {
+            (hir::Expr::FuncRef(ref name), _) => {
+                if let Some(false) = self.known.get(name) {
+                    // Calling a non-async function
+                } else {
+                    // Conservatively assume it is async
+                    self.result = true;
+                }
+            }
+            _ => {
+                // Conservatively assume it is async
+                self.result = true;
+            }
+        }
+    }
 }
 impl<'a> HirVisitor for Check<'a> {
     fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<()> {
         match texpr {
             (hir::Expr::FunCall(fexpr, _), _) => {
-                match **fexpr {
-                    (hir::Expr::FuncRef(ref name), _) => {
-                        if let Some(false) = self.known.get(name) {
-                            // Calling a non-async function
-                        } else {
-                            // Conservatively assume it is async
-                            self.result = true;
-                        }
-                    }
-                    _ => {
-                        // Conservatively assume it is async
-                        self.result = true;
-                    }
-                }
+                self.check_fexpr(fexpr);
+            }
+            (hir::Expr::CondReturn(_, fexpr_t, _, fexpr_f, _), _) => {
+                self.check_fexpr(fexpr_t);
+                self.check_fexpr(fexpr_f);
             }
             _ => {}
         }

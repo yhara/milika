@@ -152,11 +152,6 @@ impl<'a> LowerAsyncIf<'a> {
             ),
             hir::Expr::Alloc(_) => e,
             hir::Expr::Return(expr) => hir::Expr::return_(self.compile_expr(*expr)?),
-            hir::Expr::Cast(_, _) => {
-                return Err(anyhow!(
-                    "[BUG] cast should not appear before lower_async_if"
-                ))
-            }
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
                 self.compile_if(&e.1, *cond_expr, then_exprs, else_exprs)?
             }
@@ -188,16 +183,12 @@ impl<'a> LowerAsyncIf<'a> {
         });
         let endif_chap = Chapter::new_suffixed(&func_name, "e", endif_params); // e for endif
 
-        let then_ret = hir::Expr::yield_(self.goto_call(&then_chap.name, None));
-        let else_ret = hir::Expr::yield_(self.goto_call(&else_chap.name, None));
-
         self.compile_clause(&mut then_chap, then_exprs, &endif_chap.name)?;
         self.compile_clause(&mut else_chap, else_exprs, &endif_chap.name)?;
-        let terminator = hir::Expr::return_(hir::Expr::if_(
-            new_cond_expr,
-            vec![then_ret],
-            vec![else_ret],
-        ));
+
+        let (fexpr_t, args_t) = self.goto_call(&then_chap.name, None);
+        let (fexpr_f, args_f) = self.goto_call(&else_chap.name, None);
+        let terminator = hir::Expr::cond_return(new_cond_expr, fexpr_t, args_t, fexpr_f, args_f);
         self.chapters.add_stmt(terminator);
         self.chapters.add(then_chap);
         self.chapters.add(else_chap);
@@ -225,13 +216,18 @@ impl<'a> LowerAsyncIf<'a> {
             clause_chap.add_stmt(new_expr);
         }
         let new_vexpr = self.compile_expr(*vexpr)?;
-        let goto_endif = hir::Expr::return_(self.goto_call(&endif_chap_name, Some(new_vexpr)));
+        let (fexpr, args) = self.goto_call(&endif_chap_name, Some(new_vexpr));
+        let goto_endif = hir::Expr::return_(hir::Expr::fun_call(fexpr, args));
         clause_chap.add_stmt(goto_endif);
         Ok(())
     }
 
     /// Generate a call to the chapter function
-    fn goto_call(&self, chap_name: &str, to_endif: Option<hir::TypedExpr>) -> hir::TypedExpr {
+    fn goto_call(
+        &self,
+        chap_name: &str,
+        to_endif: Option<hir::TypedExpr>,
+    ) -> (hir::TypedExpr, Vec<hir::TypedExpr>) {
         let mut args = self
             .orig_func
             .params
@@ -250,7 +246,7 @@ impl<'a> LowerAsyncIf<'a> {
             args.push(expr);
         }
         let chap_fun_ty = self.chapter_fun_ty(t);
-        hir::Expr::fun_call(hir::Expr::func_ref(chap_name, chap_fun_ty), args)
+        (hir::Expr::func_ref(chap_name, chap_fun_ty), args)
     }
 
     fn chapter_fun_ty(&self, endif: Option<hir::Ty>) -> hir::FunTy {

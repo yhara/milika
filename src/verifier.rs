@@ -86,6 +86,13 @@ fn _verify_expr(f: &hir::blocked::Function, e: &hir::TypedExpr) -> Result<()> {
                 }
             }
         }
+        hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
+            verify_expr(f, cond)?;
+            verify_expr(f, fexpr_t)?;
+            verify_exprs(f, args_t)?;
+            verify_expr(f, fexpr_f)?;
+            verify_exprs(f, args_f)?;
+        }
         hir::Expr::Br(e, n) => {
             if *n >= f.body_blocks.len() {
                 bail!("block index out of range: {}", n);

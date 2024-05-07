@@ -274,6 +274,14 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
+    // Appears after `lower_async_if`
+    CondReturn(
+        Box<Typed<Expr>>,
+        Box<Typed<Expr>>,
+        Vec<Typed<Expr>>,
+        Box<Typed<Expr>>,
+        Vec<Typed<Expr>>,
+    ),
     // Appears after `lower_if`
     Br(Box<Typed<Expr>>, usize),
     CondBr(Box<Typed<Expr>>, usize, usize),
@@ -343,6 +351,13 @@ impl std::fmt::Display for Expr {
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}", e.0),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
+            Expr::CondReturn(cond, fexpr_t, _args_t, fexpr_f, _args_f) => {
+                write!(
+                    f,
+                    "cond_return {}, {}(...), {}(...)",
+                    cond.0, fexpr_t.0, fexpr_f.0
+                )
+            }
             Expr::Br(e, target) => write!(f, "%br ^bb{}({})", target, e.0),
             Expr::CondBr(cond, target_t, target_f) => {
                 write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
@@ -441,6 +456,25 @@ impl Expr {
             CastType::FunToAny => Ty::Any,
         };
         (Expr::Cast(cast_type, Box::new(e)), ty)
+    }
+
+    pub fn cond_return(
+        cond: TypedExpr,
+        fexpr_t: TypedExpr,
+        args_t: Vec<TypedExpr>,
+        fexpr_f: TypedExpr,
+        args_f: Vec<TypedExpr>,
+    ) -> TypedExpr {
+        (
+            Expr::CondReturn(
+                Box::new(cond),
+                Box::new(fexpr_t),
+                args_t,
+                Box::new(fexpr_f),
+                args_f,
+            ),
+            Ty::Void,
+        )
     }
 
     pub fn br(value: TypedExpr, target: usize) -> TypedExpr {

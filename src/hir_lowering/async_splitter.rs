@@ -109,6 +109,12 @@ impl AsyncSplitter {
         let mut split_funcs = vec![];
         while let Some(chap) = chapters.pop_front() {
             let new_func = if i == 0 {
+                let body_stmts = if n_chapters == 1 {
+                    // intros are not needed when compiling an async if.
+                    chap.stmts
+                } else {
+                    prepend_async_intro(&orig_func, chap.stmts)
+                };
                 // Entry point function has the same name as the original.
                 hir::Function {
                     is_async: None,
@@ -123,7 +129,7 @@ impl AsyncSplitter {
                         orig_func.ret_ty.clone().into(),
                     ),
                     ret_ty: hir::Ty::RustFuture,
-                    body_stmts: prepend_async_intro(&orig_func, chap.stmts),
+                    body_stmts,
                 }
             } else {
                 // The rest of the functions have a name like `foo_1`, `foo_2`, ...
@@ -229,12 +235,35 @@ impl AsyncSplitter {
             hir::Expr::While(_cond_expr, _body_exprs) => todo!(),
             hir::Expr::Alloc(_) => e,
             hir::Expr::Return(expr) => hir::Expr::return_(self.compile_expr(orig_func, *expr)?),
-            hir::Expr::Cast(_, _) => {
-                return Err(anyhow!(
-                    "[BUG] cast should not appear before async_splitter"
+            hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
+                let new_cond = self.compile_expr(orig_func, *cond)?;
+                let new_fexpr_t = self.compile_expr(orig_func, *fexpr_t)?;
+                let new_fexpr_f = self.compile_expr(orig_func, *fexpr_f)?;
+                let mut new_args_t = args_t
+                    .into_iter()
+                    .map(|x| self.compile_expr(orig_func, x))
+                    .collect::<Result<Vec<_>>>()?;
+                let mut new_args_f = args_f
+                    .into_iter()
+                    .map(|x| self.compile_expr(orig_func, x))
+                    .collect::<Result<Vec<_>>>()?;
+
+                // Original program contains async-if.
+                // Generate `return if(cond){ fexpr_t($env, $cont, args_t) }
+                //                     else { fexpr_f($env, %cont, args_f) }`
+                new_args_t.insert(0, arg_ref_env());
+                new_args_t.insert(1, arg_ref_cont(orig_func.ret_ty.clone()));
+                let call_t = hir::Expr::fun_call(new_fexpr_t, new_args_t);
+                new_args_f.insert(0, arg_ref_env());
+                new_args_f.insert(1, arg_ref_cont(orig_func.ret_ty.clone()));
+                let call_f = hir::Expr::fun_call(new_fexpr_f, new_args_f);
+                hir::Expr::return_(hir::Expr::if_(
+                    new_cond,
+                    vec![hir::Expr::yield_(call_t)],
+                    vec![hir::Expr::yield_(call_f)],
                 ))
             }
-            _ => todo!(),
+            _ => panic!("[BUG] unexpected for async_splitter: {:?}", e.0),
         };
         Ok(new_e)
     }
@@ -340,23 +369,27 @@ fn append_async_outro(
     mut stmts: Vec<hir::TypedExpr>,
     result_ty: hir::Ty,
 ) -> Vec<hir::TypedExpr> {
-    let (hir::Expr::Return(ret_val), _) = stmts.pop().unwrap() else {
-        panic!("TODO: async func must end with `return` now");
-    };
-    let cont = {
-        let cont_ty = hir::Ty::Fun(hir::FunTy {
-            is_async: false,
-            param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
-            ret_ty: Box::new(hir::Ty::RustFuture),
-        });
-        let n_pop = orig_func.params.len() + 1; // +1 for $cont
-        call_chiika_env_pop(n_pop, cont_ty)
-    };
-    stmts.push(hir::Expr::return_(hir::Expr::fun_call(
-        cont,
-        vec![arg_ref_env(), *ret_val],
-    )));
-    stmts
+    match stmts.pop().unwrap().0 {
+        hir::Expr::Return(e) => {
+            let ret_val = *e;
+            let cont = {
+                let cont_ty = hir::Ty::Fun(hir::FunTy {
+                    is_async: false,
+                    param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
+                    ret_ty: Box::new(hir::Ty::RustFuture),
+                });
+                let n_pop = orig_func.params.len() + 1; // +1 for $cont
+                call_chiika_env_pop(n_pop, cont_ty)
+            };
+            stmts.push(hir::Expr::return_(hir::Expr::fun_call(
+                cont,
+                vec![arg_ref_env(), ret_val],
+            )));
+            stmts
+        }
+        hir::Expr::CondReturn(_, _, _, _, _) => panic!("unexpected"),
+        _ => panic!("TODO: async func must end with `return` now"),
+    }
 }
 
 /// Create name of generated function like `foo_1`
@@ -413,7 +446,7 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
         let cast_type = match val.1 {
             hir::Ty::Int => hir::CastType::IntToAny,
             hir::Ty::Fun(_) => hir::CastType::FunToAny,
-            _ => panic!("[BUG] cannot cast: {:?}", val.1),
+            _ => panic!("[BUG] don't know how to cast {:?} to Any", val),
         };
         hir::Expr::cast(cast_type, val)
     };

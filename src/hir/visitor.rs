@@ -64,6 +64,17 @@ pub trait HirVisitor {
             hir::Expr::Cast(_, expr) => {
                 self.walk_expr(expr)?;
             }
+            hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
+                self.walk_expr(cond)?;
+                self.walk_expr(fexpr_t)?;
+                for arg in args_t {
+                    self.walk_expr(arg)?;
+                }
+                self.walk_expr(fexpr_f)?;
+                for arg in args_f {
+                    self.walk_expr(arg)?;
+                }
+            }
             hir::Expr::Br(_, _) => {}
             hir::Expr::CondBr(expr, _, _) => {
                 self.walk_expr(expr)?;

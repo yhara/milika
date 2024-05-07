@@ -25,6 +25,7 @@ fn main() -> Result<()> {
     }
     bhir.funcs.append(&mut prelude_hir.funcs);
 
+    println!("-- verifier input --\n{bhir}\n");
     verifier::run(&bhir)?;
 
     println!("{bhir}");
@@ -48,11 +49,20 @@ fn compile(src: &str, path: &str, is_prelude: bool) -> Result<hir::blocked::Prog
     };
     let mut hir = hir::untyped::create(&ast)?;
     hir::typing::run(&mut hir)?;
+    let mut hir = hir_lowering::lower_async_if::run(hir)?;
     hir::asyncness_check::run(&mut hir);
-    let hir = hir_lowering::lower_async_if::run(hir)?;
+    debug(format!("-- async_splitter input --\n{hir}\n"), !is_prelude);
     let hir = hir_lowering::async_splitter::run(hir)?;
+    debug(format!("-- async_splitter output --\n{hir}\n"), !is_prelude);
+    //let hir = hir_lowering::lower_cond_return::run(hir);
     let bhir = hir_lowering::lower_if::run(hir);
     Ok(bhir)
+}
+
+fn debug(s: String, print: bool) {
+    if print {
+        println!("{}", s);
+    }
 }
 
 fn main_is_async(hir: &hir::blocked::Program) -> Result<bool> {
