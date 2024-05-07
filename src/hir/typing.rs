@@ -21,7 +21,7 @@ pub fn run(hir: &mut hir::Program) -> Result<()> {
         c.sigs.insert(e.name.clone(), e.fun_ty());
     }
     for f in &hir.funcs {
-        c.sigs.insert(f.name.clone(), f.fun_ty(false));
+        c.sigs.insert(f.name.clone(), f.fun_ty());
     }
 
     for f in hir.funcs.iter_mut() {

@@ -250,13 +250,13 @@ impl<'a> LowerAsyncIf<'a> {
     }
 
     fn chapter_fun_ty(&self, endif: Option<hir::Ty>) -> hir::FunTy {
-        let mut param_tys = self.orig_func.fun_ty(false).param_tys.clone();
+        let mut param_tys = self.orig_func.fun_ty().param_tys.clone();
         param_tys.extend(self.allocs.iter().map(|(_, ty)| ty.clone()));
         if let Some(t) = endif {
             param_tys.push(t);
         }
         hir::FunTy {
-            is_async: true,
+            asyncness: self.orig_func.asyncness.clone(),
             param_tys,
             ret_ty: Box::new(self.orig_func.ret_ty.clone()),
         }

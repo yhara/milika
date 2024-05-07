@@ -42,7 +42,7 @@ impl Compiler {
         }
         let mut lvars = HashSet::new();
         Ok(hir::Function {
-            is_async: None,
+            asyncness: hir::Asyncness::Unknown,
             name: f.name.clone(),
             params,
             ret_ty: compile_ty(&f.ret_ty)?,
@@ -198,7 +198,7 @@ fn compile_fun_ty(x: &ast::FunTy) -> Result<hir::FunTy> {
     }
     let ret_ty = Box::new(compile_ty(&x.ret_ty)?);
     Ok(hir::FunTy {
-        is_async: false,
+        asyncness: hir::Asyncness::Unknown,
         param_tys,
         ret_ty,
     })

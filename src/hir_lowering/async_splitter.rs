@@ -82,13 +82,13 @@ impl AsyncSplitter {
             self.chapters.back_mut().unwrap().stmts.push(new_expr);
         }
 
-        if f.is_async.unwrap() {
+        if f.asyncness.is_async() {
             let chaps = self.chapters.drain(..).collect();
             self._generate_split_funcs(f, chaps)
         } else {
             // Has no async call; no modification needed
             Ok(vec![hir::Function {
-                is_async: None,
+                asyncness: hir::Asyncness::Lowered,
                 name: f.name,
                 params: f.params.into_iter().map(|x| x.into()).collect(),
                 ret_ty: f.ret_ty.into(),
@@ -117,7 +117,7 @@ impl AsyncSplitter {
                 };
                 // Entry point function has the same name as the original.
                 hir::Function {
-                    is_async: None,
+                    asyncness: hir::Asyncness::Lowered,
                     name: orig_func.name.clone(),
                     // It takes `$env` and `$cont` before the original params
                     params: prepend_async_params(
@@ -134,7 +134,7 @@ impl AsyncSplitter {
             } else {
                 // The rest of the functions have a name like `foo_1`, `foo_2`, ...
                 hir::Function {
-                    is_async: None,
+                    asyncness: hir::Asyncness::Lowered,
                     name: chapter_func_name(&orig_func.name, i),
                     params: vec![
                         hir::Param::new(hir::Ty::ChiikaEnv, "$env"),
@@ -207,7 +207,7 @@ impl AsyncSplitter {
                 let hir::Ty::Fun(fun_ty) = &new_fexpr.1 else {
                     return Err(anyhow!("[BUG] not a function: {:?}", new_fexpr.0));
                 };
-                if fun_ty.is_async {
+                if fun_ty.asyncness.is_async() {
                     self.compile_async_call(orig_func, new_fexpr, new_args)?
                 } else {
                     hir::Expr::fun_call(new_fexpr, new_args)
@@ -237,8 +237,10 @@ impl AsyncSplitter {
             hir::Expr::Return(expr) => hir::Expr::return_(self.compile_expr(orig_func, *expr)?),
             hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
                 let new_cond = self.compile_expr(orig_func, *cond)?;
-                let new_fexpr_t = self.compile_expr(orig_func, *fexpr_t)?;
-                let new_fexpr_f = self.compile_expr(orig_func, *fexpr_f)?;
+                let mut new_fexpr_t = self.compile_expr(orig_func, *fexpr_t)?;
+                new_fexpr_t.1 = async_fun_ty(&new_fexpr_t.1.into()).into();
+                let mut new_fexpr_f = self.compile_expr(orig_func, *fexpr_f)?;
+                new_fexpr_f.1 = async_fun_ty(&new_fexpr_f.1.into()).into();
                 let mut new_args_t = args_t
                     .into_iter()
                     .map(|x| self.compile_expr(orig_func, x))
@@ -284,7 +286,7 @@ impl AsyncSplitter {
         let next_chapter = {
             let next_chapter_name = chapter_func_name(&orig_func.name, self.chapters.len());
             let next_chapter_ty = hir::FunTy {
-                is_async: false,
+                asyncness: hir::Asyncness::Lowered,
                 param_tys: vec![hir::Ty::ChiikaEnv, *fun_ty.ret_ty.clone()],
                 ret_ty: Box::new(hir::Ty::RustFuture),
             };
@@ -314,13 +316,13 @@ fn async_fun_ty(orig_fun_ty: &hir::FunTy) -> hir::FunTy {
     param_tys.insert(
         1,
         hir::Ty::Fun(hir::FunTy {
-            is_async: false,
+            asyncness: hir::Asyncness::Lowered,
             param_tys: vec![hir::Ty::ChiikaEnv, *orig_fun_ty.ret_ty.clone()],
             ret_ty: Box::new(hir::Ty::RustFuture),
         }),
     );
     hir::FunTy {
-        is_async: true,
+        asyncness: hir::Asyncness::Lowered,
         param_tys,
         ret_ty: Box::new(hir::Ty::RustFuture),
     }
@@ -332,7 +334,7 @@ fn prepend_async_params(params: &[hir::Param], result_ty: hir::Ty) -> Vec<hir::P
     new_params.insert(0, hir::Param::new(hir::Ty::ChiikaEnv, "$env"));
 
     let fun_ty = hir::FunTy {
-        is_async: false,
+        asyncness: hir::Asyncness::Lowered,
         param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
         ret_ty: Box::new(hir::Ty::RustFuture),
     };
@@ -374,7 +376,7 @@ fn append_async_outro(
             let ret_val = *e;
             let cont = {
                 let cont_ty = hir::Ty::Fun(hir::FunTy {
-                    is_async: false,
+                    asyncness: hir::Asyncness::Lowered,
                     param_tys: vec![hir::Ty::ChiikaEnv, result_ty],
                     ret_ty: Box::new(hir::Ty::RustFuture),
                 });
@@ -406,7 +408,7 @@ fn arg_ref_env() -> hir::TypedExpr {
 /// The continuation takes an argument.
 fn arg_ref_cont(arg_ty: hir::Ty) -> hir::TypedExpr {
     let cont_ty = hir::FunTy {
-        is_async: false,
+        asyncness: hir::Asyncness::Lowered,
         param_tys: vec![hir::Ty::ChiikaEnv, arg_ty],
         ret_ty: Box::new(hir::Ty::RustFuture),
     };
@@ -421,7 +423,7 @@ fn arg_ref_async_result(ty: hir::Ty) -> hir::TypedExpr {
 fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr {
     let env_pop = {
         let fun_ty = hir::FunTy {
-            is_async: false,
+            asyncness: hir::Asyncness::Lowered,
             param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
             ret_ty: Box::new(hir::Ty::Any),
         };
@@ -451,7 +453,7 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
         hir::Expr::cast(cast_type, val)
     };
     let fun_ty = hir::FunTy {
-        is_async: false,
+        asyncness: hir::Asyncness::Lowered,
         param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any],
         ret_ty: Box::new(hir::Ty::Int),
     };
@@ -463,7 +465,7 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
 
 fn func_ref_env_ref() -> hir::TypedExpr {
     let fun_ty = hir::FunTy {
-        is_async: false,
+        asyncness: hir::Asyncness::Lowered,
         param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
         // Milika lvars are all int
         ret_ty: Box::new(hir::Ty::Int),

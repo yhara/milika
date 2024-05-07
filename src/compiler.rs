@@ -142,7 +142,7 @@ impl<'c> Compiler<'c> {
         Ok(dialect::func::func(
             &self.context,
             self.str_attr(&f.name),
-            TypeAttribute::new(self.function_type(&f.fun_ty(false))?.into()),
+            TypeAttribute::new(self.function_type(&f.fun_ty())?.into()),
             region,
             &[],
             self.unknown_loc(),

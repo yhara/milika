@@ -40,7 +40,6 @@ impl fmt::Display for Program {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub is_async: Option<bool>, // None means "unknown" or "N/A" depending on the phase
     pub name: String,
     pub params: Vec<hir::Param>,
     pub ret_ty: hir::Ty,
@@ -75,9 +74,9 @@ impl fmt::Display for Function {
 }
 
 impl Function {
-    pub fn fun_ty(&self, is_async: bool) -> hir::FunTy {
+    pub fn fun_ty(&self) -> hir::FunTy {
         hir::FunTy {
-            is_async,
+            asyncness: hir::Asyncness::Lowered,
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }

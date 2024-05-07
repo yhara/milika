@@ -59,7 +59,7 @@ impl Extern {
 
     pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async: self.is_async,
+            asyncness: self.is_async.into(),
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -86,7 +86,7 @@ impl fmt::Display for Extern {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub is_async: Option<bool>, // None means "unknown" or "N/A" depending on the phase
+    pub asyncness: Asyncness,
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
@@ -95,11 +95,6 @@ pub struct Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let func = match self.is_async {
-            Some(true) => "fun*",
-            Some(false) => "fun",
-            None => "func",
-        };
         let para = self
             .params
             .iter()
@@ -108,20 +103,20 @@ impl fmt::Display for Function {
             .join(", ");
         write!(
             f,
-            "{} {}({}) -> {} {{\n",
-            func, self.name, para, self.ret_ty
+            "fun {}{}({}) -> {} {{\n",
+            self.name, self.asyncness, para, self.ret_ty
         )?;
         for expr in &self.body_stmts {
-            write!(f, "  {};  #-> {}\n", &expr.0, &expr.1)?;
+            write!(f, "  {}  #-> {}\n", &expr.0, &expr.1)?;
         }
         write!(f, "}}\n")
     }
 }
 
 impl Function {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy {
+    pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async,
+            asyncness: self.asyncness.clone(),
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -207,7 +202,7 @@ impl TryFrom<ast::Ty> for Ty {
 impl Ty {
     pub fn chiika_cont() -> Ty {
         Ty::Fun(FunTy {
-            is_async: false,
+            asyncness: Asyncness::Lowered,
             param_tys: vec![Ty::ChiikaEnv, Ty::Any],
             ret_ty: Box::new(Ty::RustFuture),
         })
@@ -216,7 +211,7 @@ impl Ty {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunTy {
-    pub is_async: bool,
+    pub asyncness: Asyncness,
     pub param_tys: Vec<Ty>,
     pub ret_ty: Box<Ty>,
 }
@@ -239,12 +234,21 @@ impl From<FunTy> for Ty {
     }
 }
 
+impl From<Ty> for FunTy {
+    fn from(x: Ty) -> Self {
+        match x {
+            Ty::Fun(f) => f,
+            _ => panic!("[BUG] not a function type: {:?}", x),
+        }
+    }
+}
+
 impl TryFrom<ast::FunTy> for FunTy {
     type Error = anyhow::Error;
 
     fn try_from(x: ast::FunTy) -> Result<Self> {
         Ok(Self {
-            is_async: false,
+            asyncness: Asyncness::Unknown,
             param_tys: x
                 .param_tys
                 .into_iter()
@@ -252,6 +256,46 @@ impl TryFrom<ast::FunTy> for FunTy {
                 .collect::<Result<_>>()?,
             ret_ty: Box::new((*x.ret_ty).try_into()?),
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Asyncness {
+    Unknown,
+    Sync,
+    Async,
+    Lowered,
+}
+
+impl fmt::Display for Asyncness {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Asyncness::Unknown => write!(f, "[?]"),
+            Asyncness::Sync => write!(f, "[+]"),
+            Asyncness::Async => write!(f, "[*]"),
+            Asyncness::Lowered => write!(f, "[.]"),
+        }
+    }
+}
+
+impl From<bool> for Asyncness {
+    fn from(x: bool) -> Self {
+        if x {
+            Asyncness::Async
+        } else {
+            Asyncness::Sync
+        }
+    }
+}
+
+impl Asyncness {
+    pub fn is_async(&self) -> bool {
+        match self {
+            Asyncness::Unknown => panic!("[BUG] asyncness is unknown"),
+            Asyncness::Async => true,
+            Asyncness::Sync => false,
+            Asyncness::Lowered => panic!("[BUG] asyncness is lost"),
+        }
     }
 }
 
@@ -315,7 +359,10 @@ impl std::fmt::Display for Expr {
             Expr::FuncRef(name) => write!(f, "{}", name),
             Expr::OpCall(op, lhs, rhs) => write!(f, "({} {} {})", lhs.0, op, rhs.0),
             Expr::FunCall(func, args) => {
-                write!(f, "{}(", func.0)?;
+                let Ty::Fun(fun_ty) = &func.1 else {
+                    panic!("[BUG] not a function: {:?}", func);
+                };
+                write!(f, "{}{}(", func.0, fun_ty.asyncness)?;
                 for (i, arg) in args.iter().enumerate() {
                     if i != 0 {
                         write!(f, ", ")?;
@@ -339,7 +386,7 @@ impl std::fmt::Display for Expr {
                 }
                 Ok(())
             }
-            Expr::Yield(e) => write!(f, "yield {}", e.0),
+            Expr::Yield(e) => write!(f, "yield {}  # {}", e.0, e.1),
             Expr::While(cond, body) => {
                 write!(f, "while {} {{\n", cond.0)?;
                 for stmt in body {
@@ -349,13 +396,19 @@ impl std::fmt::Display for Expr {
             }
             Expr::Alloc(name) => write!(f, "alloc {}", name),
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
-            Expr::Return(e) => write!(f, "return {}", e.0),
+            Expr::Return(e) => write!(f, "return {}  # {}", e.0, e.1),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
             Expr::CondReturn(cond, fexpr_t, _args_t, fexpr_f, _args_f) => {
+                let Ty::Fun(fun_ty_t) = &fexpr_t.1 else {
+                    panic!("[BUG] not a function: {:?}", fexpr_t);
+                };
+                let Ty::Fun(fun_ty_f) = &fexpr_f.1 else {
+                    panic!("[BUG] not a function: {:?}", fexpr_f);
+                };
                 write!(
                     f,
-                    "cond_return {}, {}(...), {}(...)",
-                    cond.0, fexpr_t.0, fexpr_f.0
+                    "cond_return {}, {}{}(...), {}{}(...)",
+                    cond.0, fexpr_t.0, fun_ty_t.asyncness, fexpr_f.0, fun_ty_f.asyncness
                 )
             }
             Expr::Br(e, target) => write!(f, "%br ^bb{}({})", target, e.0),

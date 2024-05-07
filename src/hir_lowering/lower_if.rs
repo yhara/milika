@@ -51,7 +51,6 @@ pub fn run(program: hir::Program) -> blocked::Program {
             let mut c = Compiler::new(&f);
             c.compile_func(f.body_stmts);
             blocked::Function {
-                is_async: f.is_async,
                 name: f.name,
                 params: f.params,
                 ret_ty: f.ret_ty,
