@@ -207,6 +207,20 @@ impl Ty {
             ret_ty: Box::new(Ty::RustFuture),
         })
     }
+
+    pub fn as_fun_ty(&self) -> &FunTy {
+        match self {
+            Ty::Fun(f) => f,
+            _ => panic!("[BUG] not a function type: {:?}", self),
+        }
+    }
+
+    pub fn into_fun_ty(self) -> FunTy {
+        match self {
+            Ty::Fun(f) => f,
+            _ => panic!("[BUG] not a function type: {:?}", self),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
