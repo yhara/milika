@@ -177,13 +177,14 @@ impl HirRewriter for Update<'_> {
                 Ok((texpr.0, fun_ty.into()))
             }
             // Fix indirect calls
-            hir::Expr::FunCall(fexpr, args) => {
+            hir::Expr::FunCall(mut fexpr, args) => {
                 let mut fun_ty = fexpr.1.clone().into_fun_ty();
                 if fun_ty.asyncness == hir::Asyncness::Unknown {
                     // Conservatively assume it is async
                     fun_ty.asyncness = hir::Asyncness::Async;
                 }
-                Ok((hir::Expr::FunCall(fexpr, args), fun_ty.into()))
+                fexpr.1 = fun_ty.into();
+                Ok(hir::Expr::fun_call(*fexpr, args))
             }
             _ => Ok(texpr),
         }
