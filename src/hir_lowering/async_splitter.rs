@@ -237,28 +237,28 @@ impl AsyncSplitter {
             hir::Expr::Return(expr) => hir::Expr::return_(self.compile_expr(orig_func, *expr)?),
             hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
                 let new_cond = self.compile_expr(orig_func, *cond)?;
-                let mut new_fexpr_t = self.compile_expr(orig_func, *fexpr_t)?;
-                new_fexpr_t.1 = async_fun_ty(&new_fexpr_t.1.into()).into();
-                let mut new_fexpr_f = self.compile_expr(orig_func, *fexpr_f)?;
-                new_fexpr_f.1 = async_fun_ty(&new_fexpr_f.1.into()).into();
-                let mut new_args_t = args_t
+
+                let new_fexpr_t = self.compile_expr(orig_func, *fexpr_t)?;
+                let new_fexpr_f = self.compile_expr(orig_func, *fexpr_f)?;
+                let new_args_t = args_t
                     .into_iter()
                     .map(|x| self.compile_expr(orig_func, x))
                     .collect::<Result<Vec<_>>>()?;
-                let mut new_args_f = args_f
+                let new_args_f = args_f
                     .into_iter()
                     .map(|x| self.compile_expr(orig_func, x))
                     .collect::<Result<Vec<_>>>()?;
 
-                // Original program contains async-if.
-                // Generate `return if(cond){ fexpr_t($env, $cont, args_t) }
-                //                     else { fexpr_f($env, %cont, args_f) }`
-                new_args_t.insert(0, arg_ref_env());
-                new_args_t.insert(1, arg_ref_cont(orig_func.ret_ty.clone()));
-                let call_t = hir::Expr::fun_call(new_fexpr_t, new_args_t);
-                new_args_f.insert(0, arg_ref_env());
-                new_args_f.insert(1, arg_ref_cont(orig_func.ret_ty.clone()));
-                let call_f = hir::Expr::fun_call(new_fexpr_f, new_args_f);
+                let call_t = if new_fexpr_t.1.as_fun_ty().asyncness.is_async() {
+                    into_async_call(new_fexpr_t, new_args_t, orig_func.ret_ty.clone())
+                } else {
+                    hir::Expr::fun_call(new_fexpr_t, new_args_t)
+                };
+                let call_f = if new_fexpr_f.1.as_fun_ty().asyncness.is_async() {
+                    into_async_call(new_fexpr_f, new_args_f, orig_func.ret_ty.clone())
+                } else {
+                    hir::Expr::fun_call(new_fexpr_f, new_args_f)
+                };
                 hir::Expr::return_(hir::Expr::if_(
                     new_cond,
                     vec![hir::Expr::yield_(call_t)],
@@ -326,6 +326,17 @@ fn async_fun_ty(orig_fun_ty: &hir::FunTy) -> hir::FunTy {
         param_tys,
         ret_ty: Box::new(hir::Ty::RustFuture),
     }
+}
+
+fn into_async_call(
+    mut fexpr: hir::TypedExpr,
+    mut args: Vec<hir::TypedExpr>,
+    orig_ret_ty: hir::Ty,
+) -> hir::TypedExpr {
+    fexpr.1 = async_fun_ty(&fexpr.1.into()).into();
+    args.insert(0, arg_ref_env());
+    args.insert(1, arg_ref_cont(orig_ret_ty));
+    hir::Expr::fun_call(fexpr, args)
 }
 
 /// Prepend params for async (`$env` and `$cont`)
