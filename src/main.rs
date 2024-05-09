@@ -49,16 +49,18 @@ fn compile(src: &str, path: &str, is_prelude: bool) -> Result<hir::blocked::Prog
     };
     let mut hir = hir::untyped::create(&ast)?;
     hir::typing::run(&mut hir)?;
-    debug(format!("-- typing output --\n{hir}\n"), !is_prelude);
-    let hir = hir_lowering::lower_async_if::run(hir)?;
-    debug(format!("-- lower_async_if output --\n{hir}\n"), !is_prelude);
-    let hir = hir::asyncness_check::run(hir);
-    debug(
-        format!("-- asyncness_check output --\n{hir}\n"),
-        !is_prelude,
-    );
-    let hir = hir_lowering::async_splitter::run(hir)?;
-    debug(format!("-- async_splitter output --\n{hir}\n"), !is_prelude);
+    if !is_prelude {
+        debug(format!("-- typing output --\n{hir}\n"), !is_prelude);
+        hir = hir_lowering::lower_async_if::run(hir)?;
+        debug(format!("-- lower_async_if output --\n{hir}\n"), !is_prelude);
+        hir = hir::asyncness_check::run(hir);
+        debug(
+            format!("-- asyncness_check output --\n{hir}\n"),
+            !is_prelude,
+        );
+        hir = hir_lowering::async_splitter::run(hir)?;
+        debug(format!("-- async_splitter output --\n{hir}\n"), !is_prelude);
+    }
     let bhir = hir_lowering::lower_if::run(hir);
     Ok(bhir)
 }
