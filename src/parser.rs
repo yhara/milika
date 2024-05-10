@@ -73,9 +73,8 @@ peg::parser! {
       / yield()
       / while()
       / return()
-      / funcall()
       / assign()
-      / additive()
+      / equality()
 
     rule alloc() -> ast::Expr
       = "alloc" _ name:ident() { ast::Expr::Alloc(name) }
@@ -99,11 +98,6 @@ peg::parser! {
     rule return() -> ast::Expr
       = "return" _ e:expr() { ast::Expr::Return(Box::new(e)) }
 
-    rule funcall() -> ast::Expr
-      = f:callee() _ "(" _ args:args() _ ")" {
-        ast::Expr::FunCall(Box::new(f), args)
-      }
-
     rule args() -> Vec<ast::Expr>
       = (expr() ** (_ "," _))
 
@@ -113,6 +107,11 @@ peg::parser! {
 
     rule assign() -> ast::Expr
       = v:ident() _ "=" _ e:expr() { ast::Expr::Assign(v, Box::new(e)) }
+
+    rule equality() -> ast::Expr
+      = l:additive() _ "==" _ r:additive() { ast::Expr::OpCall("==".to_string(), Box::new(l), Box::new(r)) }
+      / l:additive() _ "!=" _ r:additive() { ast::Expr::OpCall("!=".to_string(), Box::new(l), Box::new(r)) }
+      / additive()
 
     rule additive() -> ast::Expr
       = l:multiplicative() _ "+" _ r:additive() { ast::Expr::OpCall("+".to_string(), Box::new(l), Box::new(r)) }
@@ -126,8 +125,14 @@ peg::parser! {
 
     rule atom() -> ast::Expr
       = n:number() { n }
+      / funcall()
       / v:var_ref() { v }
       / "(" _ e:expr() _ ")" { e }
+
+    rule funcall() -> ast::Expr
+      = f:callee() _ "(" _ args:args() _ ")" {
+        ast::Expr::FunCall(Box::new(f), args)
+      }
 
     rule number() -> ast::Expr
       = n:$(['0'..='9']+) {?
