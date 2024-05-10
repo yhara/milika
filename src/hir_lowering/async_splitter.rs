@@ -249,16 +249,20 @@ impl AsyncSplitter {
                     .map(|x| self.compile_expr(orig_func, x))
                     .collect::<Result<Vec<_>>>()?;
 
-                let call_t = if new_fexpr_t.1.as_fun_ty().asyncness.is_async() {
-                    into_async_call(new_fexpr_t, new_args_t, orig_func.ret_ty.clone())
-                } else {
-                    hir::Expr::fun_call(new_fexpr_t, new_args_t)
-                };
-                let call_f = if new_fexpr_f.1.as_fun_ty().asyncness.is_async() {
-                    into_async_call(new_fexpr_f, new_args_f, orig_func.ret_ty.clone())
-                } else {
-                    hir::Expr::fun_call(new_fexpr_f, new_args_f)
-                };
+                let mut call_t = hir::Expr::fun_call(new_fexpr_t.clone(), new_args_t.clone());
+                let mut call_f = hir::Expr::fun_call(new_fexpr_f.clone(), new_args_f.clone());
+                if orig_func.asyncness.is_async() {
+                    call_t = if new_fexpr_t.1.as_fun_ty().asyncness.is_async() {
+                        into_async_call(new_fexpr_t, new_args_t, orig_func.ret_ty.clone())
+                    } else {
+                        hir::Expr::fun_call(arg_ref_cont(orig_func.ret_ty.clone()), vec![call_t])
+                    };
+                    call_f = if new_fexpr_f.1.as_fun_ty().asyncness.is_async() {
+                        into_async_call(new_fexpr_f, new_args_f, orig_func.ret_ty.clone())
+                    } else {
+                        hir::Expr::fun_call(arg_ref_cont(orig_func.ret_ty.clone()), vec![call_f])
+                    };
+                }
                 hir::Expr::return_(hir::Expr::if_(
                     new_cond,
                     vec![hir::Expr::yield_(call_t)],
