@@ -255,12 +255,18 @@ impl AsyncSplitter {
                     call_t = if new_fexpr_t.1.as_fun_ty().asyncness.is_async() {
                         into_async_call(new_fexpr_t, new_args_t, orig_func.ret_ty.clone())
                     } else {
-                        hir::Expr::fun_call(arg_ref_cont(orig_func.ret_ty.clone()), vec![call_t])
+                        hir::Expr::fun_call(
+                            arg_ref_cont(orig_func.ret_ty.clone()),
+                            vec![arg_ref_env(), call_t],
+                        )
                     };
                     call_f = if new_fexpr_f.1.as_fun_ty().asyncness.is_async() {
                         into_async_call(new_fexpr_f, new_args_f, orig_func.ret_ty.clone())
                     } else {
-                        hir::Expr::fun_call(arg_ref_cont(orig_func.ret_ty.clone()), vec![call_f])
+                        hir::Expr::fun_call(
+                            arg_ref_cont(orig_func.ret_ty.clone()),
+                            vec![arg_ref_env(), call_f],
+                        )
                     };
                 }
                 hir::Expr::return_(hir::Expr::if_(
