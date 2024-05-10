@@ -27,42 +27,42 @@ pub trait HirVisitor {
             hir::Expr::ArgRef(_) => {}
             hir::Expr::FuncRef(_) => {}
             hir::Expr::OpCall(_, lhs, rhs) => {
-                self.walk_expr(lhs)?;
-                self.walk_expr(rhs)?;
+                self.visit_expr(lhs)?;
+                self.visit_expr(rhs)?;
             }
             hir::Expr::FunCall(fexpr, arg_exprs) => {
-                self.walk_expr(fexpr)?;
+                self.visit_expr(fexpr)?;
                 for arg in arg_exprs {
-                    self.walk_expr(arg)?;
+                    self.visit_expr(arg)?;
                 }
             }
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
-                self.walk_expr(cond_expr)?;
+                self.visit_expr(cond_expr)?;
                 for expr in then_exprs {
-                    self.walk_expr(expr)?;
+                    self.visit_expr(expr)?;
                 }
                 for expr in else_exprs {
-                    self.walk_expr(expr)?;
+                    self.visit_expr(expr)?;
                 }
             }
             hir::Expr::Yield(expr) => {
-                self.walk_expr(expr)?;
+                self.visit_expr(expr)?;
             }
             hir::Expr::While(cond_expr, body_exprs) => {
-                self.walk_expr(cond_expr)?;
+                self.visit_expr(cond_expr)?;
                 for expr in body_exprs {
-                    self.walk_expr(expr)?;
+                    self.visit_expr(expr)?;
                 }
             }
             hir::Expr::Alloc(_) => {}
             hir::Expr::Assign(_, rhs) => {
-                self.walk_expr(rhs)?;
+                self.visit_expr(rhs)?;
             }
             hir::Expr::Return(expr) => {
-                self.walk_expr(expr)?;
+                self.visit_expr(expr)?;
             }
             hir::Expr::Cast(_, expr) => {
-                self.walk_expr(expr)?;
+                self.visit_expr(expr)?;
             }
         }
         self.visit_expr(expr)?;
@@ -70,27 +70,27 @@ pub trait HirVisitor {
     }
 }
 
-pub struct Allocs(Vec<(String, hir::Ty)>);
-impl Allocs {
-    /// Collects `alloc`ed variable names and their types.
-    pub fn collect(body_stmts: &[hir::TypedExpr]) -> Result<Vec<(String, hir::Ty)>> {
-        let mut a = Allocs(vec![]);
-        a.walk_exprs(body_stmts)?;
-        Ok(a.0)
-    }
-}
-impl HirVisitor for Allocs {
-    fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<()> {
-        match texpr {
-            (hir::Expr::Alloc(name), ty) => {
-                self.0.push((name.clone(), ty.clone()));
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-}
-
+//pub struct Allocs(Vec<(String, hir::Ty)>);
+//impl Allocs {
+//    /// Collects `alloc`ed variable names and their types.
+//    pub fn collect(body_stmts: &[hir::TypedExpr]) -> Result<Vec<(String, hir::Ty)>> {
+//        let mut a = Allocs(vec![]);
+//        a.walk_exprs(body_stmts)?;
+//        Ok(a.0)
+//    }
+//}
+//impl HirVisitor for Allocs {
+//    fn visit_expr(&mut self, texpr: &hir::TypedExpr) -> Result<()> {
+//        match texpr {
+//            (hir::Expr::Alloc(name), ty) => {
+//                self.0.push((name.clone(), ty.clone()));
+//            }
+//            _ => {}
+//        }
+//        Ok(())
+//    }
+//}
+//
 //pub struct NoAsyncTy(());
 //impl NoAsyncTy {
 //    /// Asserts that there is no `async` type in the program.

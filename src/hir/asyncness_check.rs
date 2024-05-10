@@ -14,6 +14,7 @@ pub fn run(hir: &mut hir::Program) {
     }
 
     for f in hir.funcs.iter_mut() {
+        // TODO: Better detection
         f.is_async = Some(Check::run(&f, &known).unwrap());
     }
 }

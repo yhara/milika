@@ -25,9 +25,9 @@ fn main() -> Result<()> {
     }
     hir.funcs.append(&mut prelude_hir.funcs);
 
-    //println!("-- verifier input--\n{hir}");
     verifier::run(&hir)?;
 
+    println!("{hir}");
     compiler::run(path, &src, hir)?;
     Ok(())
 }
@@ -50,9 +50,6 @@ fn compile(src: &str, path: &str, skip_async_lowering: bool) -> Result<hir::Prog
     hir::typing::run(&mut hir)?;
     if !skip_async_lowering {
         hir::asyncness_check::run(&mut hir);
-        //println!("-- after async check--\n{hir}\n--{:?}", hir);
-        hir = hir_lowering::lower_async_if::run(hir)?;
-        //println!("-- after if lowering--\n{hir}\n--{:?}", hir);
         hir = hir_lowering::async_splitter::run(hir)?;
     }
     Ok(hir)
