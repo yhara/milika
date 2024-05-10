@@ -1,4 +1,5 @@
 extern print(Int n) -> Null
+extern rand_int(Int n) -> Int
 extern(async) sleep_sec(Int n) -> Null
 
 #fun main() -> int {
@@ -12,7 +13,8 @@ extern(async) sleep_sec(Int n) -> Null
 #}
 
 fun chiika_main() -> Null {
-  if (true) {
+  if (rand_int(2) == 0) {
+    sleep_sec(1)
     print(456)
   } else {
     print(789)
