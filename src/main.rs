@@ -14,25 +14,26 @@ fn main() -> Result<()> {
         bail!("usage: milika a.milika > a.mlir");
     };
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
-    let mut hir = compile(&src, &path, false)?;
+    let mut bhir = compile(&src, &path, false)?;
 
-    let prelude_txt = prelude::prelude_funcs(main_is_async(&hir)?);
+    let prelude_txt = prelude::prelude_funcs(main_is_async(&bhir)?);
     let mut prelude_hir = compile(&prelude_txt, "src/prelude.rs", true)?;
     for e in prelude_hir.externs {
         if !e.is_internal {
-            hir.externs.push(e);
+            bhir.externs.push(e);
         }
     }
-    hir.funcs.append(&mut prelude_hir.funcs);
+    bhir.funcs.append(&mut prelude_hir.funcs);
 
-    verifier::run(&hir)?;
+    println!("-- verifier input --\n{bhir}\n");
+    verifier::run(&bhir)?;
 
-    println!("{hir}");
-    compiler::run(path, &src, hir)?;
+    println!("{bhir}");
+    compiler::run(path, &src, bhir)?;
     Ok(())
 }
 
-fn compile(src: &str, path: &str, skip_async_lowering: bool) -> Result<hir::Program> {
+fn compile(src: &str, path: &str, is_prelude: bool) -> Result<hir::blocked::Program> {
     let ast = match parser::parse(src) {
         Ok(ast) => ast,
         Err(e) => {
@@ -48,14 +49,29 @@ fn compile(src: &str, path: &str, skip_async_lowering: bool) -> Result<hir::Prog
     };
     let mut hir = hir::untyped::create(&ast)?;
     hir::typing::run(&mut hir)?;
-    if !skip_async_lowering {
-        hir::asyncness_check::run(&mut hir);
+    if !is_prelude {
+        debug(format!("-- typing output --\n{hir}\n"), !is_prelude);
+        hir = hir_lowering::lower_async_if::run(hir)?;
+        debug(format!("-- lower_async_if output --\n{hir}\n"), !is_prelude);
+        hir = hir::asyncness_check::run(hir);
+        debug(
+            format!("-- asyncness_check output --\n{hir}\n"),
+            !is_prelude,
+        );
         hir = hir_lowering::async_splitter::run(hir)?;
+        debug(format!("-- async_splitter output --\n{hir}\n"), !is_prelude);
     }
-    Ok(hir)
+    let bhir = hir_lowering::lower_if::run(hir);
+    Ok(bhir)
 }
 
-fn main_is_async(hir: &hir::Program) -> Result<bool> {
+fn debug(s: String, print: bool) {
+    if print {
+        println!("{}", s);
+    }
+}
+
+fn main_is_async(hir: &hir::blocked::Program) -> Result<bool> {
     let Some(main) = hir.funcs.iter().find(|x| x.name == "chiika_main") else {
         bail!("chiika_main not found");
     };

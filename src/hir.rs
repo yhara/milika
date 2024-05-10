@@ -1,4 +1,6 @@
 pub mod asyncness_check;
+pub mod blocked;
+pub mod rewriter;
 pub mod typing;
 pub mod untyped;
 pub mod visitor;
@@ -57,7 +59,7 @@ impl Extern {
 
     pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async: self.is_async,
+            asyncness: self.is_async.into(),
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -84,7 +86,7 @@ impl fmt::Display for Extern {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub is_async: Option<bool>, // None means "unknown" or "N/A" depending on the phase
+    pub asyncness: Asyncness,
     pub name: String,
     pub params: Vec<Param>,
     pub ret_ty: Ty,
@@ -99,18 +101,22 @@ impl fmt::Display for Function {
             .map(|p| p.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        write!(f, "fun {}({}) -> {} {{\n", self.name, para, self.ret_ty)?;
+        write!(
+            f,
+            "fun {}{}({}) -> {} {{\n",
+            self.name, self.asyncness, para, self.ret_ty
+        )?;
         for expr in &self.body_stmts {
-            write!(f, "  {};  #-> {}\n", &expr.0, &expr.1)?;
+            write!(f, "  {}  #-> {}\n", &expr.0, &expr.1)?;
         }
         write!(f, "}}\n")
     }
 }
 
 impl Function {
-    pub fn fun_ty(&self, is_async: bool) -> FunTy {
+    pub fn fun_ty(&self) -> FunTy {
         FunTy {
-            is_async,
+            asyncness: self.asyncness.clone(),
             param_tys: self.params.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(),
             ret_ty: Box::new(self.ret_ty.clone()),
         }
@@ -196,16 +202,30 @@ impl TryFrom<ast::Ty> for Ty {
 impl Ty {
     pub fn chiika_cont() -> Ty {
         Ty::Fun(FunTy {
-            is_async: false,
+            asyncness: Asyncness::Lowered,
             param_tys: vec![Ty::ChiikaEnv, Ty::Any],
             ret_ty: Box::new(Ty::RustFuture),
         })
     }
+
+    pub fn as_fun_ty(&self) -> &FunTy {
+        match self {
+            Ty::Fun(f) => f,
+            _ => panic!("[BUG] not a function type: {:?}", self),
+        }
+    }
+
+    pub fn into_fun_ty(self) -> FunTy {
+        match self {
+            Ty::Fun(f) => f,
+            _ => panic!("[BUG] not a function type: {:?}", self),
+        }
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FunTy {
-    pub is_async: bool,
+    pub asyncness: Asyncness,
     pub param_tys: Vec<Ty>,
     pub ret_ty: Box<Ty>,
 }
@@ -218,7 +238,13 @@ impl fmt::Display for FunTy {
             .map(|p| p.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        write!(f, "FN(({})->{})", para, &self.ret_ty)
+        write!(f, "({})->{}", para, &self.ret_ty)
+    }
+}
+
+impl fmt::Debug for FunTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
@@ -228,12 +254,21 @@ impl From<FunTy> for Ty {
     }
 }
 
+impl From<Ty> for FunTy {
+    fn from(x: Ty) -> Self {
+        match x {
+            Ty::Fun(f) => f,
+            _ => panic!("[BUG] not a function type: {:?}", x),
+        }
+    }
+}
+
 impl TryFrom<ast::FunTy> for FunTy {
     type Error = anyhow::Error;
 
     fn try_from(x: ast::FunTy) -> Result<Self> {
         Ok(Self {
-            is_async: false,
+            asyncness: Asyncness::Unknown,
             param_tys: x
                 .param_tys
                 .into_iter()
@@ -241,6 +276,46 @@ impl TryFrom<ast::FunTy> for FunTy {
                 .collect::<Result<_>>()?,
             ret_ty: Box::new((*x.ret_ty).try_into()?),
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Asyncness {
+    Unknown,
+    Sync,
+    Async,
+    Lowered,
+}
+
+impl fmt::Display for Asyncness {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Asyncness::Unknown => write!(f, "[?]"),
+            Asyncness::Sync => write!(f, "[+]"),
+            Asyncness::Async => write!(f, "[*]"),
+            Asyncness::Lowered => write!(f, "[.]"),
+        }
+    }
+}
+
+impl From<bool> for Asyncness {
+    fn from(x: bool) -> Self {
+        if x {
+            Asyncness::Async
+        } else {
+            Asyncness::Sync
+        }
+    }
+}
+
+impl Asyncness {
+    pub fn is_async(&self) -> bool {
+        match self {
+            Asyncness::Unknown => panic!("[BUG] asyncness is unknown"),
+            Asyncness::Async => true,
+            Asyncness::Sync => false,
+            Asyncness::Lowered => panic!("[BUG] asyncness is lost"),
+        }
     }
 }
 
@@ -263,6 +338,18 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
+    // Appears after `lower_async_if`
+    CondReturn(
+        Box<Typed<Expr>>,
+        Box<Typed<Expr>>,
+        Vec<Typed<Expr>>,
+        Box<Typed<Expr>>,
+        Vec<Typed<Expr>>,
+    ),
+    // Appears after `lower_if`
+    Br(Box<Typed<Expr>>, usize),
+    CondBr(Box<Typed<Expr>>, usize, usize),
+    BlockArgRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -292,7 +379,10 @@ impl std::fmt::Display for Expr {
             Expr::FuncRef(name) => write!(f, "{}", name),
             Expr::OpCall(op, lhs, rhs) => write!(f, "({} {} {})", lhs.0, op, rhs.0),
             Expr::FunCall(func, args) => {
-                write!(f, "{}(", func.0)?;
+                let Ty::Fun(fun_ty) = &func.1 else {
+                    panic!("[BUG] not a function: {:?}", func);
+                };
+                write!(f, "{}{}(", func.0, fun_ty.asyncness)?;
                 for (i, arg) in args.iter().enumerate() {
                     if i != 0 {
                         write!(f, ", ")?;
@@ -316,7 +406,7 @@ impl std::fmt::Display for Expr {
                 }
                 Ok(())
             }
-            Expr::Yield(e) => write!(f, "yield {}", e.0),
+            Expr::Yield(e) => write!(f, "yield {}  # {}", e.0, e.1),
             Expr::While(cond, body) => {
                 write!(f, "while {} {{\n", cond.0)?;
                 for stmt in body {
@@ -326,8 +416,26 @@ impl std::fmt::Display for Expr {
             }
             Expr::Alloc(name) => write!(f, "alloc {}", name),
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
-            Expr::Return(e) => write!(f, "return {}", e.0),
+            Expr::Return(e) => write!(f, "return {}  # {}", e.0, e.1),
             Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
+            Expr::CondReturn(cond, fexpr_t, _args_t, fexpr_f, _args_f) => {
+                let Ty::Fun(fun_ty_t) = &fexpr_t.1 else {
+                    panic!("[BUG] not a function: {:?}", fexpr_t);
+                };
+                let Ty::Fun(fun_ty_f) = &fexpr_f.1 else {
+                    panic!("[BUG] not a function: {:?}", fexpr_f);
+                };
+                write!(
+                    f,
+                    "cond_return {}, {}{}(...), {}{}(...)",
+                    cond.0, fexpr_t.0, fun_ty_t.asyncness, fexpr_f.0, fun_ty_f.asyncness
+                )
+            }
+            Expr::Br(e, target) => write!(f, "%br ^bb{}({})  # {}", target, e.0, e.1),
+            Expr::CondBr(cond, target_t, target_f) => {
+                write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
+            }
+            Expr::BlockArgRef => write!(f, "%block_arg"),
         }
     }
 }
@@ -335,6 +443,18 @@ impl std::fmt::Display for Expr {
 impl Expr {
     pub fn number(n: i64) -> TypedExpr {
         (Expr::Number(n), Ty::Int)
+    }
+
+    //pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
+    //    let t = match pv {
+    //        PseudoVar::True | PseudoVar::False => Ty::Bool,
+    //        PseudoVar::Null => Ty::Null,
+    //    };
+    //    (Expr::PseudoVar(pv), t)
+    //}
+
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
     }
 
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
@@ -345,28 +465,35 @@ impl Expr {
         (Expr::FuncRef(name.into()), fun_ty.into())
     }
 
-    pub fn op_call(op: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr, ty: Ty) -> TypedExpr {
-        (Expr::OpCall(op.into(), Box::new(lhs), Box::new(rhs)), ty)
+    pub fn op_call(op_: impl Into<String>, lhs: TypedExpr, rhs: TypedExpr) -> TypedExpr {
+        let op = op_.into();
+        let ty = match &op[..] {
+            "+" | "-" | "*" | "/" => Ty::Int,
+            "<" | "<=" | ">" | ">=" | "==" | "!=" => Ty::Bool,
+            _ => panic!("[BUG] unknown operator: {op}"),
+        };
+        (Expr::OpCall(op, Box::new(lhs), Box::new(rhs)), ty)
     }
 
-    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>, result_ty: Ty) -> TypedExpr {
+    pub fn fun_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
+        let result_ty = match &func.1 {
+            Ty::Fun(f) => *f.ret_ty.clone(),
+            _ => panic!("[BUG] not a function: {:?}", func),
+        };
         (Expr::FunCall(Box::new(func), args), result_ty)
     }
 
-    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> Result<TypedExpr> {
+    pub fn if_(cond: TypedExpr, then: Vec<TypedExpr>, else_: Vec<TypedExpr>) -> TypedExpr {
         if cond.1 != Ty::Bool {
-            return Err(anyhow!("[BUG] if cond not bool: {:?}", cond));
+            panic!("[BUG] if cond not bool: {:?}", cond);
         }
         let t1 = yielded_ty(&then);
         let t2 = yielded_ty(&else_);
-        if t1 != t2 || t1.is_none() || t2.is_none() {
-            return Err(anyhow!(
-                "[BUG] if type invalid (t1: {:?}, t2: {:?})",
-                t1,
-                t2
-            ));
+        if t1 != t2 {
+            panic!("[BUG] if types mismatch (t1: {:?}, t2: {:?})", t1, t2);
         }
-        Ok((Expr::If(Box::new(cond), then, else_), t1.unwrap()))
+
+        (Expr::If(Box::new(cond), then, else_), t1)
     }
 
     pub fn yield_(expr: TypedExpr) -> TypedExpr {
@@ -379,6 +506,13 @@ impl Expr {
         (Expr::Yield(Box::new(null)), Ty::Null)
     }
 
+    pub fn while_(cond: TypedExpr, body: Vec<TypedExpr>) -> TypedExpr {
+        if cond.1 != Ty::Bool {
+            panic!("[BUG] while cond not bool: {:?}", cond);
+        }
+        (Expr::While(Box::new(cond), body), Ty::Null)
+    }
+
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
         (Expr::Assign(name.into(), Box::new(e)), Ty::Void)
     }
@@ -387,17 +521,52 @@ impl Expr {
         (Expr::Return(Box::new(e)), Ty::Void)
     }
 
-    pub fn cast(e: TypedExpr, cast_type: CastType, ty: Ty) -> TypedExpr {
+    pub fn cast(cast_type: CastType, e: TypedExpr) -> TypedExpr {
+        let ty = match &cast_type {
+            CastType::AnyToFun(f) => f.clone().into(),
+            CastType::AnyToInt => Ty::Int,
+            CastType::IntToAny => Ty::Any,
+            CastType::FunToAny => Ty::Any,
+        };
         (Expr::Cast(cast_type, Box::new(e)), ty)
+    }
+
+    pub fn cond_return(
+        cond: TypedExpr,
+        fexpr_t: TypedExpr,
+        args_t: Vec<TypedExpr>,
+        fexpr_f: TypedExpr,
+        args_f: Vec<TypedExpr>,
+    ) -> TypedExpr {
+        (
+            Expr::CondReturn(
+                Box::new(cond),
+                Box::new(fexpr_t),
+                args_t,
+                Box::new(fexpr_f),
+                args_f,
+            ),
+            Ty::Void,
+        )
+    }
+
+    pub fn br(value: TypedExpr, target: usize) -> TypedExpr {
+        (Expr::Br(Box::new(value), target), Ty::Void)
+    }
+
+    pub fn cond_br(cond: TypedExpr, target_t: usize, target_f: usize) -> TypedExpr {
+        (Expr::CondBr(Box::new(cond), target_t, target_f), Ty::Void)
+    }
+
+    pub fn block_arg_ref(ty: Ty) -> TypedExpr {
+        (Expr::BlockArgRef, ty)
     }
 }
 
-pub fn yielded_ty(stmts: &[TypedExpr]) -> Option<Ty> {
-    stmts
-        .last()
-        .map(|stmt| match &stmt.0 {
-            Expr::Yield(val) => Some(val.1.clone()),
-            _ => None,
-        })
-        .flatten()
+pub fn yielded_ty(stmts: &[TypedExpr]) -> Ty {
+    let stmt = stmts.last().unwrap();
+    match &stmt.0 {
+        Expr::Yield(val) => val.1.clone(),
+        _ => panic!("[BUG] if branch not terminated with yield: {:?}", stmt),
+    }
 }

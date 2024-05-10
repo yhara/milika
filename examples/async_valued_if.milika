@@ -1,0 +1,14 @@
+extern print(Int n) -> Null
+extern(async) sleep_sec(Int n) -> Null
+
+fun chiika_main() -> Null {
+  print(
+    if (true) {
+      sleep_sec(1)
+      yield 456
+    } else {
+      yield 789
+    }
+  )
+  return null
+}

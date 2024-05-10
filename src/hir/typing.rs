@@ -21,7 +21,7 @@ pub fn run(hir: &mut hir::Program) -> Result<()> {
         c.sigs.insert(e.name.clone(), e.fun_ty());
     }
     for f in &hir.funcs {
-        c.sigs.insert(f.name.clone(), f.fun_ty(false));
+        c.sigs.insert(f.name.clone(), f.fun_ty());
     }
 
     for f in hir.funcs.iter_mut() {
@@ -102,8 +102,8 @@ impl<'f> Typing<'f> {
                 }
                 self.compile_exprs(lvars, then)?;
                 self.compile_exprs(lvars, els)?;
-                let t1 = hir::yielded_ty(&then).unwrap();
-                let t2 = hir::yielded_ty(&els).unwrap();
+                let t1 = hir::yielded_ty(&then);
+                let t2 = hir::yielded_ty(&els);
                 if t1 != t2 {
                     return Err(anyhow!(
                         "then and else should have the same type but got {:?} and {:?}",
@@ -146,6 +146,7 @@ impl<'f> Typing<'f> {
             hir::Expr::Cast(_, _) => {
                 return Err(anyhow!("[BUG] Cast unexpected here"));
             }
+            _ => panic!("must not occur in hir::typing"),
         };
         Ok(())
     }
