@@ -425,7 +425,7 @@ impl std::fmt::Display for Expr {
                     cond.0, fexpr_t.0, fun_ty_t.asyncness, fexpr_f.0, fun_ty_f.asyncness
                 )
             }
-            Expr::Br(e, target) => write!(f, "%br ^bb{}({})", target, e.0),
+            Expr::Br(e, target) => write!(f, "%br ^bb{}({})  # {}", target, e.0, e.1),
             Expr::CondBr(cond, target_t, target_f) => {
                 write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
             }
