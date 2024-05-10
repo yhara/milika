@@ -10,6 +10,14 @@ PREFIX, SUFFIX =
   end
 SRC = Dir["src/**/*"]
 
+task :clean do
+  [".", "examples"].each do |dir|
+    cd dir do
+      sh "rm -f *.mlir *.tmp *.ll *.out *.actual_out"
+    end
+  end
+end
+
 def lowering(name)
   sh "mlir-opt#{SUFFIX} \
     --async-func-to-async-runtime \
