@@ -53,6 +53,7 @@ pub fn run(mut hir: hir::Program) -> hir::Program {
 struct Check<'a> {
     is_async: bool,
     funcs: &'a HashMap<String, &'a hir::Function>,
+    current_func: &'a str,
     known: &'a mut HashMap<String, bool>,
     checking: &'a HashSet<String>,
     depends: HashSet<String>,
@@ -69,6 +70,7 @@ impl<'a> Check<'a> {
         let mut c = Check {
             is_async: false,
             funcs,
+            current_func: fname,
             known,
             checking,
             depends: HashSet::new(),
@@ -88,7 +90,9 @@ impl<'a> Check<'a> {
         match fexpr {
             (hir::Expr::FuncRef(ref name), _) => {
                 if !self.known.contains_key(name) {
-                    if self.checking.contains(name) {
+                    if name == self.current_func {
+                        // Ignore call to itself
+                    } else if self.checking.contains(name) {
                         // Avoid infinite recursion
                         self.depends.insert(name.clone());
                     } else {
