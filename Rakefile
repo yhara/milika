@@ -58,13 +58,17 @@ file "#{NAME}.ll" => ["#{NAME}2.mlir"] do
   sh "mlir-translate#{SUFFIX} --mlir-to-llvmir #{NAME}2.mlir > #{NAME}.ll"
 end
 
-file "#{NAME}.out" => [RUNTIME_A, "#{NAME}.ll"] do
+file "#{NAME}.opt.ll" => ["#{NAME}.ll"] do
+  sh "opt#{SUFFIX} -O3 #{NAME}.ll | llvm-dis#{SUFFIX} > #{NAME}.opt.ll"
+end
+
+file "#{NAME}.out" => [RUNTIME_A, "#{NAME}.opt.ll"] do
   sh "clang#{SUFFIX}",
     "-lm",
     "-ldl",
     "-lpthread",
     "-o", "#{NAME}.out",
-    "#{NAME}.ll",
+    "#{NAME}.opt.ll",
     RUNTIME_A
 end
 
