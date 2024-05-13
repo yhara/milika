@@ -13,6 +13,8 @@ fn main() -> Result<()> {
     let Some(path) = args.get(1) else {
         bail!("usage: milika a.milika > a.mlir");
     };
+    println!("--CUTHERE--");
+
     let src = std::fs::read_to_string(path).context(format!("failed to read {}", path))?;
     let mut bhir = compile(&src, &path, false)?;
 
@@ -25,10 +27,9 @@ fn main() -> Result<()> {
     }
     bhir.funcs.append(&mut prelude_hir.funcs);
 
-    println!("-- verifier input --\n{bhir}\n");
+    print_as_comment(&format!("-- verifier input --\n{bhir}\n"));
     verifier::run(&bhir)?;
 
-    println!("{bhir}");
     compiler::run(path, &src, bhir)?;
     Ok(())
 }
@@ -67,8 +68,12 @@ fn compile(src: &str, path: &str, is_prelude: bool) -> Result<hir::blocked::Prog
 
 fn debug(s: String, print: bool) {
     if print {
-        println!("{}", s);
+        print_as_comment(&s);
     }
+}
+
+fn print_as_comment(s: &str) {
+    s.lines().for_each(|line| println!("// {}", line));
 }
 
 fn main_is_async(hir: &hir::blocked::Program) -> Result<bool> {

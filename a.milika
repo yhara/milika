@@ -11,11 +11,13 @@ extern(async) sleep_sec(Int n) -> Null
 #  return 0;
 #}
 
+fun countup(Int i) -> Null {
+  print(i)
+  sleep_sec(1)
+  return countup(i + 1)
+}
+
 fun chiika_main() -> Null {
-  if (true) {
-    print(456)
-  } else {
-    print(789)
-  }
+  countup(0)
   return null
 }

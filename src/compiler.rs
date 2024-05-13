@@ -89,7 +89,6 @@ impl<'c> Compiler<'c> {
         //pass_manager.add_pass(pass::conversion::create_control_flow_to_llvm());
         //pass_manager.add_pass(pass::conversion::create_finalize_mem_ref_to_llvm());
         //pass_manager.run(&mut module).unwrap();
-        eprintln!("--CUTHERE--");
         module.as_operation().dump();
         //assert!(module.as_operation().verify());
         Ok(())
