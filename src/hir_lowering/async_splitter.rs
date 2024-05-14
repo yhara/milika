@@ -183,8 +183,7 @@ impl AsyncSplitter {
             }
             hir::Expr::ArgRef(idx) => {
                 if self.chapters.len() == 1 {
-                    // The variable is just there in the first chapter
-                    e
+                    hir::Expr::arg_ref(idx + N_ASYNC_PARAMS, e.1)
                 } else {
                     hir::Expr::fun_call(
                         func_ref_env_ref(),
