@@ -420,37 +420,35 @@ impl<'c> Compiler<'c> {
         let e = self.compile_value_expr(blocks, block, lvars, expr)?;
         let v = match cast_type {
             hir::CastType::AnyToFun(fun_ty) => {
+                let op = ods::llvm::inttoptr(
+                    self.context,
+                    self.ptr_type().into(),
+                    e,
+                    self.unknown_loc(),
+                );
+                let v = val(block.append_operation(op.into()));
                 let op = ods::builtin::unrealized_conversion_cast(
                     self.context,
                     &[self.function_type(fun_ty)?.into()],
-                    &[e],
+                    &[v],
                     self.unknown_loc(),
                 );
                 val(block.append_operation(op.into()))
             }
-            hir::CastType::AnyToInt => {
-                let op = ods::llvm::ptrtoint(
-                    self.context,
-                    self.int_type().into(),
-                    e,
-                    self.unknown_loc(),
-                );
-                val(block.append_operation(op.into()))
-            }
-            hir::CastType::IntToAny => {
-                let op = ods::llvm::inttoptr(
-                    self.context,
-                    self.int_type().into(),
-                    e,
-                    self.unknown_loc(),
-                );
-                val(block.append_operation(op.into()))
-            }
+            hir::CastType::AnyToInt => e,
+            hir::CastType::IntToAny => e,
             hir::CastType::FunToAny => {
                 let op = ods::builtin::unrealized_conversion_cast(
                     self.context,
                     &[self.ptr_type().into()],
                     &[e],
+                    self.unknown_loc(),
+                );
+                let v = val(block.append_operation(op.into()));
+                let op = ods::llvm::ptrtoint(
+                    self.context,
+                    self.int_type().into(),
+                    v,
                     self.unknown_loc(),
                 );
                 val(block.append_operation(op.into()))
@@ -610,8 +608,8 @@ impl<'c> Compiler<'c> {
         let t = match ty {
             hir::Ty::Unknown => return Err(anyhow!("Unknown is unexpected here")),
             hir::Ty::Void => return Err(anyhow!("void is unexpected here")),
-            hir::Ty::Any | hir::Ty::ChiikaEnv | hir::Ty::RustFuture => self.ptr_type().into(),
-            hir::Ty::Int | hir::Ty::Null => self.int_type().into(),
+            hir::Ty::ChiikaEnv | hir::Ty::RustFuture => self.ptr_type().into(),
+            hir::Ty::Any | hir::Ty::Int | hir::Ty::Null => self.int_type().into(),
             hir::Ty::Bool => Type::parse(&self.context, "i1").unwrap(),
             hir::Ty::Fun(fun_ty) => self.function_type(fun_ty)?.into(),
         };
