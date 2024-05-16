@@ -1,0 +1,9 @@
+/*.tmp
+/*.out
+/*.mlir
+/*.actual_out
+/examples/*.tmp
+/examples/*.out
+/examples/*.mlir
+/examples/*.ll
+/examples/*.actual_out

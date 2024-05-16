@@ -9,50 +9,62 @@ declare i64 @print(i64)
 
 declare ptr @sleep_sec(ptr, ptr, i64)
 
-declare i64 @chiika_env_push(ptr, ptr)
+declare i64 @chiika_env_push(ptr, i64)
 
-declare ptr @chiika_env_pop(ptr, i64)
+declare i64 @chiika_env_pop(ptr, i64)
 
 declare i64 @chiika_env_ref(ptr, i64)
 
 declare i64 @chiika_start_tokio(i64)
 
-define i64 @chiika_main() {
-  br i1 true, label %1, label %3
-
-1:                                                ; preds = %0
-  %2 = call i64 @"chiika_main't"()
-  br label %5
-
-3:                                                ; preds = %0
-  %4 = call i64 @"chiika_main'f"()
-  br label %5
-
-5:                                                ; preds = %1, %3
-  %6 = phi i64 [ %4, %3 ], [ %2, %1 ]
-  ret i64 %6
+define ptr @countup(ptr %0, ptr %1, i64 %2) {
+  %4 = ptrtoint ptr %1 to i64
+  %5 = call i64 @chiika_env_push(ptr %0, i64 %4)
+  %6 = call i64 @chiika_env_push(ptr %0, i64 %2)
+  %7 = call i64 @print(i64 %2)
+  %8 = call ptr @sleep_sec(ptr %0, ptr @countup_1, i64 1)
+  ret ptr %8
 }
 
-define i64 @"chiika_main't"() {
-  %1 = call i64 @print(i64 456)
-  %2 = call i64 @"chiika_main'e"(i64 0)
-  ret i64 %2
+define ptr @countup_1(ptr %0, i64 %1) {
+  %3 = call i64 @chiika_env_ref(ptr %0, i64 0)
+  %4 = add i64 %3, 1
+  %5 = call ptr @countup(ptr %0, ptr @countup_2, i64 %4)
+  ret ptr %5
 }
 
-define i64 @"chiika_main'f"() {
-  %1 = call i64 @print(i64 789)
-  %2 = call i64 @"chiika_main'e"(i64 0)
-  ret i64 %2
+define ptr @countup_2(ptr %0, i64 %1) {
+  %3 = call i64 @chiika_env_pop(ptr %0, i64 2)
+  %4 = inttoptr i64 %3 to ptr
+  %5 = call ptr %4(ptr %0, i64 %1)
+  ret ptr %5
 }
 
-define i64 @"chiika_main'e"(i64 %0) {
-  ret i64 0
+define ptr @chiika_main(ptr %0, ptr %1) {
+  %3 = ptrtoint ptr %1 to i64
+  %4 = call i64 @chiika_env_push(ptr %0, i64 %3)
+  %5 = call i64 @print(i64 1)
+  %6 = call ptr @sleep_sec(ptr %0, ptr @chiika_main_1, i64 1)
+  ret ptr %6
+}
+
+define ptr @chiika_main_1(ptr %0, i64 %1) {
+  %3 = call i64 @print(i64 2)
+  %4 = call ptr @sleep_sec(ptr %0, ptr @chiika_main_2, i64 1)
+  ret ptr %4
+}
+
+define ptr @chiika_main_2(ptr %0, i64 %1) {
+  %3 = call i64 @print(i64 3)
+  %4 = call i64 @chiika_env_pop(ptr %0, i64 1)
+  %5 = inttoptr i64 %4 to ptr
+  %6 = call ptr %5(ptr %0, i64 0)
+  ret ptr %6
 }
 
 define ptr @chiika_start_user(ptr %0, ptr %1) {
-  %3 = call i64 @chiika_main()
-  %4 = call ptr %1(ptr %0, i64 %3)
-  ret ptr %4
+  %3 = call ptr @chiika_main(ptr %0, ptr %1)
+  ret ptr %3
 }
 
 define i64 @main() {
