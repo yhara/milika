@@ -183,7 +183,12 @@ impl AsyncSplitter {
             }
             hir::Expr::ArgRef(idx) => {
                 if self.chapters.len() == 1 {
-                    hir::Expr::arg_ref(idx + N_ASYNC_PARAMS, e.1)
+                    let new_idx = if orig_func.asyncness.is_async() {
+                        idx + N_ASYNC_PARAMS
+                    } else {
+                        idx
+                    };
+                    hir::Expr::arg_ref(new_idx, e.1)
                 } else {
                     hir::Expr::fun_call(
                         func_ref_env_ref(),
