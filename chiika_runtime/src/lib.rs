@@ -19,31 +19,43 @@ use std::task::Poll;
 //    0
 //}
 
-pub type VoidFuture = Pin<Box<dyn Future<Output = ()>>>;
+pub type ChiikaValue = *mut c_void;
+#[derive(Debug)]
+pub struct ContAndValue(Option<ChiikaCont>, ChiikaValue);
+pub type ContFuture = Pin<Box<dyn Future<Output = ContAndValue>>>;
+
 #[allow(improper_ctypes_definitions)]
-type ChiikaCont = extern "C" fn(env: *mut ChiikaEnv, value: *mut c_void) -> VoidFuture;
+type ChiikaCont = extern "C" fn(env: *mut ChiikaEnv, value: ChiikaValue) -> ContFuture;
 
 #[allow(improper_ctypes)]
 extern "C" {
-    fn chiika_start_user(env: *mut ChiikaEnv, cont: ChiikaCont) -> VoidFuture;
+    fn chiika_start_user(env: *mut ChiikaEnv, cont: ChiikaCont) -> ContFuture;
 }
 
 #[allow(improper_ctypes_definitions)]
-pub extern "C" fn chiika_finish(_env: *mut ChiikaEnv, _: *mut c_void) -> VoidFuture {
-    Box::pin(poll_fn(|_context| Poll::Ready(())))
+pub extern "C" fn chiika_finish(_env: *mut ChiikaEnv, _v: ChiikaValue) -> ContFuture {
+    Box::pin(poll_fn(move |_context| Poll::Ready(ContAndValue(None, _v))))
 }
 
 #[no_mangle]
 pub extern "C" fn chiika_start_tokio(_: i64) -> i64 {
     let mut env = ChiikaEnv::new();
     let mut future: Option<_> = None;
-    let poller = poll_fn(move |context| {
+    let poller = poll_fn(move |context| loop {
         if future.is_none() {
             future = Some(unsafe { chiika_start_user(&mut env, chiika_finish) });
         }
-        future.as_mut().unwrap().as_mut().poll(context)
+        let tmp = future.as_mut().unwrap().as_mut().poll(context);
+        match tmp {
+            Poll::Ready(ContAndValue(Some(cont), value)) => {
+                let new_future = cont(&mut env, value);
+                future = Some(new_future);
+            }
+            Poll::Ready(ContAndValue(None, _)) => return Poll::Ready(()),
+            Poll::Pending => return Poll::Pending,
+        }
     });
-    tokio::runtime::Builder::new_multi_thread()
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
