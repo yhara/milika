@@ -394,15 +394,15 @@ impl std::fmt::Display for Expr {
             Expr::If(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
-                    write!(f, "  {}\n", stmt.0)?;
+                    write!(f, "    {}\n", stmt.0)?;
                 }
-                write!(f, "}}")?;
+                write!(f, "  }}")?;
                 if !else_.is_empty() {
                     write!(f, " else {{\n")?;
                     for stmt in else_ {
-                        write!(f, "  {}\n", stmt.0)?;
+                        write!(f, "    {}\n", stmt.0)?;
                     }
-                    write!(f, "}}")?;
+                    write!(f, "  }}")?;
                 }
                 Ok(())
             }
