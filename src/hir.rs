@@ -567,6 +567,7 @@ pub fn yielded_ty(stmts: &[TypedExpr]) -> Ty {
     let stmt = stmts.last().unwrap();
     match &stmt.0 {
         Expr::Yield(val) => val.1.clone(),
+        Expr::Return(_) => Ty::Void,
         _ => panic!("[BUG] if branch not terminated with yield: {:?}", stmt),
     }
 }

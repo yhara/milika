@@ -109,8 +109,9 @@ fn compile_func(mut f: hir::Function) -> Result<Vec<hir::Function>> {
         lower.chapters.add(first_chap);
 
         for expr in body_stmts {
-            let new_expr = lower.compile_expr(expr)?;
-            lower.chapters.add_stmt(new_expr);
+            if let Some(new_expr) = lower.compile_expr(expr)? {
+                lower.chapters.add_stmt(new_expr);
+            }
         }
 
         lower.chapters
@@ -125,42 +126,52 @@ struct LowerAsyncIf<'a> {
 }
 
 impl<'a> LowerAsyncIf<'a> {
-    fn compile_expr(&mut self, e: hir::TypedExpr) -> Result<hir::TypedExpr> {
+    fn compile_value_expr(&mut self, e: hir::TypedExpr) -> Result<hir::TypedExpr> {
+        if let Some(expr) = self.compile_expr(e)? {
+            Ok(expr)
+        } else {
+            Err(anyhow!("[BUG] unexpected void expr"))
+        }
+    }
+
+    fn compile_expr(&mut self, e: hir::TypedExpr) -> Result<Option<hir::TypedExpr>> {
         let new_e = match e.0 {
             hir::Expr::Number(_) => e,
             hir::Expr::PseudoVar(_) => e,
             hir::Expr::LVarRef(_) => e,
-            hir::Expr::Assign(name, rhs) => hir::Expr::assign(name, self.compile_expr(*rhs)?),
+            hir::Expr::Assign(name, rhs) => hir::Expr::assign(name, self.compile_value_expr(*rhs)?),
             hir::Expr::ArgRef(_) => e,
             hir::Expr::FuncRef(_) => e,
-            hir::Expr::OpCall(op, lhs, rhs) => {
-                hir::Expr::op_call(op, self.compile_expr(*lhs)?, self.compile_expr(*rhs)?)
-            }
+            hir::Expr::OpCall(op, lhs, rhs) => hir::Expr::op_call(
+                op,
+                self.compile_value_expr(*lhs)?,
+                self.compile_value_expr(*rhs)?,
+            ),
             hir::Expr::FunCall(fexpr, arg_exprs) => hir::Expr::fun_call(
-                self.compile_expr(*fexpr)?,
+                self.compile_value_expr(*fexpr)?,
                 arg_exprs
                     .into_iter()
-                    .map(|expr| self.compile_expr(expr))
+                    .map(|expr| self.compile_value_expr(expr))
                     .collect::<Result<_>>()?,
             ),
             hir::Expr::While(cond_expr, body_exprs) => hir::Expr::while_(
-                self.compile_expr(*cond_expr)?,
+                self.compile_value_expr(*cond_expr)?,
                 body_exprs
                     .into_iter()
-                    .map(|expr| self.compile_expr(expr))
+                    .map(|expr| self.compile_value_expr(expr))
                     .collect::<Result<_>>()?,
             ),
             hir::Expr::Alloc(_) => e,
-            hir::Expr::Return(expr) => hir::Expr::return_(self.compile_expr(*expr)?),
+            hir::Expr::Return(expr) => hir::Expr::return_(self.compile_value_expr(*expr)?),
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
-                self.compile_if(&e.1, *cond_expr, then_exprs, else_exprs)?
+                return self.compile_if(&e.1, *cond_expr, then_exprs, else_exprs);
             }
-            hir::Expr::Yield(expr) => hir::Expr::yield_(self.compile_expr(*expr)?),
+            hir::Expr::Yield(expr) => hir::Expr::yield_(self.compile_value_expr(*expr)?),
             _ => {
                 panic!("[BUG] unexpected expr in lower_async_if: {:?}", e.0)
             }
         };
-        Ok(new_e)
+        Ok(Some(new_e))
     }
 
     fn compile_if(
@@ -169,10 +180,10 @@ impl<'a> LowerAsyncIf<'a> {
         cond_expr: hir::TypedExpr,
         then_exprs: Vec<hir::TypedExpr>,
         else_exprs: Vec<hir::TypedExpr>,
-    ) -> Result<hir::TypedExpr> {
+    ) -> Result<Option<hir::TypedExpr>> {
         let func_name = self.chapters.current_name().to_string();
 
-        let new_cond_expr = self.compile_expr(cond_expr)?;
+        let new_cond_expr = self.compile_value_expr(cond_expr)?;
         let mut then_chap = Chapter::new_suffixed(&func_name, "t", self.orig_func.params.clone());
         let mut else_chap = Chapter::new_suffixed(&func_name, "f", self.orig_func.params.clone());
         // Statements after `if` goes to an "endif" chapter
@@ -192,12 +203,16 @@ impl<'a> LowerAsyncIf<'a> {
         self.chapters.add_stmt(terminator);
         self.chapters.add(then_chap);
         self.chapters.add(else_chap);
-        self.chapters.add(endif_chap);
-
-        Ok(hir::Expr::arg_ref(
-            self.orig_func.params.len(),
-            if_ty.clone(),
-        ))
+        if *if_ty == hir::Ty::Void {
+            // Both branches end with return
+            Ok(None)
+        } else {
+            self.chapters.add(endif_chap);
+            Ok(Some(hir::Expr::arg_ref(
+                self.orig_func.params.len(),
+                if_ty.clone(),
+            )))
+        }
     }
 
     fn compile_clause(
@@ -206,19 +221,30 @@ impl<'a> LowerAsyncIf<'a> {
         mut exprs: Vec<hir::TypedExpr>,
         endif_chap_name: &str,
     ) -> Result<()> {
-        let Some((hir::Expr::Yield(vexpr), _)) = exprs.pop() else {
-            return Err(anyhow!(
-                "[BUG] last statement of a clause should be a yield"
-            ));
+        let e = exprs.pop().unwrap();
+        let opt_vexpr = match e {
+            (hir::Expr::Return(_), _) => {
+                exprs.push(e);
+                None
+            }
+            (hir::Expr::Yield(vexpr), _) => Some(vexpr),
+            _ => {
+                return Err(anyhow!(
+                    "[BUG] last statement of a clause must be a yield or a return"
+                ))
+            }
         };
         for expr in exprs {
-            let new_expr = self.compile_expr(expr)?;
-            clause_chap.add_stmt(new_expr);
+            if let Some(new_expr) = self.compile_expr(expr)? {
+                clause_chap.add_stmt(new_expr);
+            }
         }
-        let new_vexpr = self.compile_expr(*vexpr)?;
-        let (fexpr, args) = self.goto_call(&endif_chap_name, Some(new_vexpr));
-        let goto_endif = hir::Expr::return_(hir::Expr::fun_call(fexpr, args));
-        clause_chap.add_stmt(goto_endif);
+        if let Some(vexpr) = opt_vexpr {
+            let new_vexpr = self.compile_value_expr(*vexpr)?;
+            let (fexpr, args) = self.goto_call(&endif_chap_name, Some(new_vexpr));
+            let goto_endif = hir::Expr::return_(hir::Expr::fun_call(fexpr, args));
+            clause_chap.add_stmt(goto_endif);
+        }
         Ok(())
     }
 
