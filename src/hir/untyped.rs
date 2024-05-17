@@ -84,13 +84,21 @@ impl Compiler {
                 } else {
                     vec![]
                 };
-                if ends_with_yield(&then) && ends_with_yield(&els) {
+                if (ends_with_yield(&then) && ends_with_yield(&els))
+                    || (ends_with_return(&then) && ends_with_return(&els))
+                    || (ends_with_yield(&then) && ends_with_return(&els))
+                    || (ends_with_return(&then) && ends_with_yield(&els))
+                {
                     hir::Expr::If(Box::new(cond), then, els)
                 } else if ends_with_yield(&then) || ends_with_yield(&els) {
                     return Err(anyhow!("yield must be in both (or neither) branches"));
                 } else {
-                    then.push(hir::Expr::yield_null());
-                    els.push(hir::Expr::yield_null());
+                    if !ends_with_yield(&then) && !ends_with_return(&then) {
+                        then.push(hir::Expr::yield_null());
+                    }
+                    if !ends_with_yield(&els) && !ends_with_return(&els) {
+                        els.push(hir::Expr::yield_null());
+                    }
                     hir::Expr::If(Box::new(cond), then, els)
                 }
             }
@@ -206,4 +214,8 @@ fn compile_fun_ty(x: &ast::FunTy) -> Result<hir::FunTy> {
 
 fn ends_with_yield(stmts: &[hir::TypedExpr]) -> bool {
     matches!(stmts.last(), Some((hir::Expr::Yield(_), _)))
+}
+
+fn ends_with_return(stmts: &[hir::TypedExpr]) -> bool {
+    matches!(stmts.last(), Some((hir::Expr::Return(_), _)))
 }

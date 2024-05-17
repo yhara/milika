@@ -363,6 +363,7 @@ pub enum PseudoVar {
 pub enum CastType {
     AnyToFun(FunTy),
     AnyToInt,
+    NullToAny,
     IntToAny,
     FunToAny,
 }
@@ -394,15 +395,15 @@ impl std::fmt::Display for Expr {
             Expr::If(cond, then, else_) => {
                 write!(f, "if({}){{\n", cond.0)?;
                 for stmt in then {
-                    write!(f, "  {}\n", stmt.0)?;
+                    write!(f, "    {}\n", stmt.0)?;
                 }
-                write!(f, "}}")?;
+                write!(f, "  }}")?;
                 if !else_.is_empty() {
                     write!(f, " else {{\n")?;
                     for stmt in else_ {
-                        write!(f, "  {}\n", stmt.0)?;
+                        write!(f, "    {}\n", stmt.0)?;
                     }
-                    write!(f, "}}")?;
+                    write!(f, "  }}")?;
                 }
                 Ok(())
             }
@@ -525,6 +526,7 @@ impl Expr {
         let ty = match &cast_type {
             CastType::AnyToFun(f) => f.clone().into(),
             CastType::AnyToInt => Ty::Int,
+            CastType::NullToAny => Ty::Any,
             CastType::IntToAny => Ty::Any,
             CastType::FunToAny => Ty::Any,
         };
@@ -567,6 +569,7 @@ pub fn yielded_ty(stmts: &[TypedExpr]) -> Ty {
     let stmt = stmts.last().unwrap();
     match &stmt.0 {
         Expr::Yield(val) => val.1.clone(),
+        Expr::Return(_) => Ty::Void,
         _ => panic!("[BUG] if branch not terminated with yield: {:?}", stmt),
     }
 }
