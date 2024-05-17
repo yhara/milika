@@ -111,6 +111,10 @@ peg::parser! {
     rule equality() -> ast::Expr
       = l:additive() _ "==" _ r:additive() { ast::Expr::OpCall("==".to_string(), Box::new(l), Box::new(r)) }
       / l:additive() _ "!=" _ r:additive() { ast::Expr::OpCall("!=".to_string(), Box::new(l), Box::new(r)) }
+      / l:additive() _ "<" _ r:additive() { ast::Expr::OpCall("<".to_string(), Box::new(l), Box::new(r)) }
+      / l:additive() _ "<=" _ r:additive() { ast::Expr::OpCall("<=".to_string(), Box::new(l), Box::new(r)) }
+      / l:additive() _ ">" _ r:additive() { ast::Expr::OpCall(">".to_string(), Box::new(l), Box::new(r)) }
+      / l:additive() _ ">=" _ r:additive() { ast::Expr::OpCall(">=".to_string(), Box::new(l), Box::new(r)) }
       / additive()
 
     rule additive() -> ast::Expr
