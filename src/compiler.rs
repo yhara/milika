@@ -435,8 +435,7 @@ impl<'c> Compiler<'c> {
                 );
                 val(block.append_operation(op.into()))
             }
-            hir::CastType::AnyToInt => e,
-            hir::CastType::IntToAny => e,
+            hir::CastType::AnyToInt | hir::CastType::IntToAny | hir::CastType::NullToAny => e,
             hir::CastType::FunToAny => {
                 let op = ods::builtin::unrealized_conversion_cast(
                     self.context,

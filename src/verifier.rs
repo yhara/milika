@@ -77,6 +77,10 @@ fn _verify_expr(f: &hir::blocked::Function, e: &hir::TypedExpr) -> Result<()> {
                     assert(&val, "castee", &hir::Ty::Any)?;
                     assert(&e, "result", &hir::Ty::Int)?;
                 }
+                hir::CastType::NullToAny => {
+                    assert(&val, "castee", &hir::Ty::Null)?;
+                    assert(&e, "result", &hir::Ty::Any)?;
+                }
                 hir::CastType::IntToAny => {
                     assert(&val, "castee", &hir::Ty::Int)?;
                     assert(&e, "result", &hir::Ty::Any)?;

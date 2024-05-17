@@ -471,6 +471,7 @@ fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr
 fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
     let cast_val = {
         let cast_type = match val.1 {
+            hir::Ty::Null => hir::CastType::NullToAny,
             hir::Ty::Int => hir::CastType::IntToAny,
             hir::Ty::Fun(_) => hir::CastType::FunToAny,
             _ => panic!("[BUG] don't know how to cast {:?} to Any", val),

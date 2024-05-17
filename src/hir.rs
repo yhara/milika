@@ -363,6 +363,7 @@ pub enum PseudoVar {
 pub enum CastType {
     AnyToFun(FunTy),
     AnyToInt,
+    NullToAny,
     IntToAny,
     FunToAny,
 }
@@ -525,6 +526,7 @@ impl Expr {
         let ty = match &cast_type {
             CastType::AnyToFun(f) => f.clone().into(),
             CastType::AnyToInt => Ty::Int,
+            CastType::NullToAny => Ty::Any,
             CastType::IntToAny => Ty::Any,
             CastType::FunToAny => Ty::Any,
         };
