@@ -104,14 +104,20 @@ impl<'f> Typing<'f> {
                 self.compile_exprs(lvars, els)?;
                 let t1 = hir::yielded_ty(&then);
                 let t2 = hir::yielded_ty(&els);
-                if t1 != t2 {
+                let t = if t1 == hir::Ty::Void {
+                    t2
+                } else if t2 == hir::Ty::Void {
+                    t1
+                } else if t1 != t2 {
                     return Err(anyhow!(
                         "then and else should have the same type but got {:?} and {:?}",
                         t1,
                         t2
                     ));
-                }
-                e.1 = t1.clone();
+                } else {
+                    t1
+                };
+                e.1 = t.clone();
             }
             hir::Expr::Yield(val) => {
                 self.compile_expr(lvars, val)?;

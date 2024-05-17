@@ -93,8 +93,12 @@ impl Compiler {
                 } else if ends_with_yield(&then) || ends_with_yield(&els) {
                     return Err(anyhow!("yield must be in both (or neither) branches"));
                 } else {
-                    then.push(hir::Expr::yield_null());
-                    els.push(hir::Expr::yield_null());
+                    if !ends_with_yield(&then) && !ends_with_return(&then) {
+                        then.push(hir::Expr::yield_null());
+                    }
+                    if !ends_with_yield(&els) && !ends_with_return(&els) {
+                        els.push(hir::Expr::yield_null());
+                    }
                     hir::Expr::If(Box::new(cond), then, els)
                 }
             }
