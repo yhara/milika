@@ -26,7 +26,7 @@ pub fn run(mut hir: hir::Program) -> hir::Program {
             &funcs,
             &name,
             &mut known,
-            &HashSet::new(),
+            &mut HashSet::new(),
             &mut unresolved_deps,
         );
     }
@@ -55,7 +55,7 @@ struct Check<'a> {
     funcs: &'a HashMap<String, &'a hir::Function>,
     current_func: &'a str,
     known: &'a mut HashMap<String, bool>,
-    checking: &'a HashSet<String>,
+    checking: &'a mut HashSet<String>,
     depends: HashSet<String>,
     unresolved_deps: &'a mut HashMap<String, HashSet<String>>,
 }
@@ -64,7 +64,7 @@ impl<'a> Check<'a> {
         funcs: &HashMap<String, &hir::Function>,
         fname: &str,
         known: &mut HashMap<String, bool>,
-        checking: &HashSet<String>,
+        checking: &mut HashSet<String>,
         unresolved_deps: &mut HashMap<String, HashSet<String>>,
     ) {
         let mut c = Check {
@@ -76,6 +76,7 @@ impl<'a> Check<'a> {
             depends: HashSet::new(),
             unresolved_deps,
         };
+        c.checking.insert(fname.to_string());
         let func = funcs.get(fname).unwrap();
         c.walk_exprs(&func.body_stmts).unwrap();
         if c.depends.is_empty() {
@@ -101,7 +102,7 @@ impl<'a> Check<'a> {
                             &self.funcs,
                             name,
                             &mut self.known,
-                            &self.checking,
+                            &mut self.checking,
                             &mut self.unresolved_deps,
                         );
                     }
