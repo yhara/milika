@@ -1,6 +1,7 @@
 pub mod asyncness_check;
 pub mod blocked;
 pub mod rewriter;
+pub mod split;
 pub mod typing;
 pub mod untyped;
 pub mod visitor;
