@@ -221,6 +221,13 @@ impl Ty {
             _ => panic!("[BUG] not a function type: {:?}", self),
         }
     }
+
+    pub fn is_async_fun(&self) -> bool {
+        match self {
+            Ty::Fun(f) => f.asyncness.is_async(),
+            _ => panic!("[BUG] not a function type: {:?}", self),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -293,7 +300,7 @@ impl fmt::Display for Asyncness {
             Asyncness::Unknown => write!(f, "[?]"),
             Asyncness::Sync => write!(f, "[+]"),
             Asyncness::Async => write!(f, "[*]"),
-            Asyncness::Lowered => write!(f, "[.]"),
+            Asyncness::Lowered => write!(f, ""), // "[.]"
         }
     }
 }
@@ -368,6 +375,16 @@ pub enum CastType {
     FunToAny,
 }
 
+impl CastType {
+    pub fn result_ty(&self) -> Ty {
+        match self {
+            CastType::AnyToFun(x) => x.clone().into(),
+            CastType::AnyToInt => Ty::Int,
+            CastType::NullToAny | CastType::IntToAny | CastType::FunToAny => Ty::Any,
+        }
+    }
+}
+
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -418,7 +435,7 @@ impl std::fmt::Display for Expr {
             Expr::Alloc(name) => write!(f, "alloc {}", name),
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}  # {}", e.0, e.1),
-            Expr::Cast(cast_type, e) => write!(f, "{:?}({})", cast_type, e.0),
+            Expr::Cast(cast_type, e) => write!(f, "({} as {})", e.0, cast_type.result_ty()),
             Expr::CondReturn(cond, fexpr_t, _args_t, fexpr_f, _args_f) => {
                 let Ty::Fun(fun_ty_t) = &fexpr_t.1 else {
                     panic!("[BUG] not a function: {:?}", fexpr_t);
