@@ -24,8 +24,15 @@ pub extern "C" fn chiika_env_push(env: *mut ChiikaEnv, item: i64) {
 pub extern "C" fn chiika_env_pop(env: *mut ChiikaEnv, n: i64) -> i64 {
     unsafe {
         let mut item = 0;
+        let mut popped = 0;
         for _ in 0..n {
-            item = (*env).stack.pop().unwrap();
+            match (*env).stack.pop() {
+                Some(x) => item = x,
+                None => {
+                    panic!("[BUG;chiika_env_pop] Stack underflow: tried to pop {} items, but only {} items left", n, popped);
+                }
+            }
+            popped += 1;
         }
         item
     }
