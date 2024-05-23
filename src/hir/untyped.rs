@@ -42,6 +42,7 @@ impl Compiler {
         }
         let mut lvars = HashSet::new();
         Ok(hir::Function {
+            generated: false,
             asyncness: hir::Asyncness::Unknown,
             name: f.name.clone(),
             params,

@@ -88,6 +88,7 @@ impl AsyncSplitter {
         } else {
             // Has no async call; no modification needed
             Ok(vec![hir::Function {
+                generated: f.generated,
                 asyncness: hir::Asyncness::Lowered,
                 name: f.name,
                 params: f.params.into_iter().map(|x| x.into()).collect(),
@@ -103,20 +104,19 @@ impl AsyncSplitter {
         orig_func: hir::Function,
         mut chapters: VecDeque<Chapter>,
     ) -> Result<Vec<hir::Function>> {
-        let n_chapters = chapters.len();
         let mut i = 0;
         let mut last_chap_result_ty = None;
         let mut split_funcs = vec![];
         while let Some(chap) = chapters.pop_front() {
             let new_func = if i == 0 {
-                let body_stmts = if n_chapters == 1 {
-                    // intros are not needed when compiling an async if.
-                    chap.stmts
-                } else {
+                let body_stmts = if orig_func.asyncness.is_async() && !orig_func.generated {
                     prepend_async_intro(&orig_func, chap.stmts)
+                } else {
+                    chap.stmts
                 };
                 // Entry point function has the same name as the original.
                 hir::Function {
+                    generated: orig_func.generated,
                     asyncness: hir::Asyncness::Lowered,
                     name: orig_func.name.clone(),
                     // It takes `$env` and `$cont` before the original params
@@ -134,6 +134,7 @@ impl AsyncSplitter {
             } else {
                 // The rest of the functions have a name like `foo_1`, `foo_2`, ...
                 hir::Function {
+                    generated: true,
                     asyncness: hir::Asyncness::Lowered,
                     name: chapter_func_name(&orig_func.name, i),
                     params: vec![
@@ -142,7 +143,7 @@ impl AsyncSplitter {
                         hir::Param::new(last_chap_result_ty.unwrap(), "$async_result"),
                     ],
                     ret_ty: hir::Ty::RustFuture,
-                    body_stmts: chap.stmts, 
+                    body_stmts: chap.stmts,
                 }
             };
             i += 1;
@@ -239,7 +240,6 @@ impl AsyncSplitter {
             }
             hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
                 let new_cond = self.compile_expr(orig_func, *cond, false)?;
-
                 let new_fexpr_t = self.compile_expr(orig_func, *fexpr_t, false)?;
                 let new_fexpr_f = self.compile_expr(orig_func, *fexpr_f, false)?;
                 let new_args_t = args_t
@@ -250,11 +250,8 @@ impl AsyncSplitter {
                     .into_iter()
                     .map(|x| self.compile_expr(orig_func, x, false))
                     .collect::<Result<Vec<_>>>()?;
-
-                let mut call_t = hir::Expr::fun_call(new_fexpr_t.clone(), new_args_t.clone());
-                let mut call_f = hir::Expr::fun_call(new_fexpr_f.clone(), new_args_f.clone());
-                call_t = modify_async_return(orig_func, call_t);
-                call_f = modify_async_return(orig_func, call_f);
+                let call_t = modify_cond_call(new_fexpr_t, new_args_t, orig_func.ret_ty.clone());
+                let call_f = modify_cond_call(new_fexpr_f, new_args_f, orig_func.ret_ty.clone());
                 hir::Expr::return_(hir::Expr::if_(
                     new_cond,
                     vec![hir::Expr::yield_(call_t)],
@@ -390,6 +387,22 @@ fn modify_async_return(orig_func: &hir::Function, value_expr: hir::TypedExpr) ->
 
     // Pass the value to the continuation
     hir::Expr::fun_call(pop_cont, vec![arg_ref_env(), value_expr])
+}
+
+fn modify_cond_call(
+    mut fexpr: hir::TypedExpr,
+    mut args: Vec<hir::TypedExpr>,
+    orig_ret_ty: hir::Ty,
+) -> hir::TypedExpr {
+    if fexpr.1.is_async_fun() {
+        fexpr.1 = async_fun_ty(&fexpr.1.into()).into();
+        args.insert(0, arg_ref_env());
+        args.insert(1, arg_ref_cont(orig_ret_ty));
+        hir::Expr::fun_call(fexpr, args)
+    } else {
+        let sync_call = hir::Expr::fun_call(fexpr, args);
+        hir::Expr::fun_call(arg_ref_cont(orig_ret_ty), vec![arg_ref_env(), sync_call])
+    }
 }
 
 /// Create name of generated function like `foo_1`

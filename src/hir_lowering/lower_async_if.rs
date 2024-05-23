@@ -48,14 +48,16 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
 
 #[derive(Debug)]
 struct Chapter {
+    generated: bool,
     name: String,
     params: Vec<hir::Param>,
     stmts: Vec<hir::TypedExpr>,
 }
 
 impl Chapter {
-    fn new(name: String, params: Vec<hir::Param>) -> Chapter {
+    fn new(generated: bool, name: String, params: Vec<hir::Param>) -> Chapter {
         Chapter {
+            generated,
             name,
             params,
             stmts: vec![],
@@ -63,7 +65,7 @@ impl Chapter {
     }
 
     fn new_suffixed(base_name: &str, suffix: &str, params: Vec<hir::Param>) -> Chapter {
-        Chapter::new(format!("{}'{}", base_name, suffix), params)
+        Chapter::new(true, format!("{}'{}", base_name, suffix), params)
     }
 
     fn add_stmt(&mut self, stmt: hir::TypedExpr) {
@@ -105,7 +107,7 @@ fn compile_func(mut f: hir::Function) -> Result<Vec<hir::Function>> {
             orig_func: &f,
             allocs: hir::visitor::Allocs::collect(&f.body_stmts)?,
         };
-        let first_chap = Chapter::new(f.name.clone(), f.params.clone());
+        let first_chap = Chapter::new(false, f.name.clone(), f.params.clone());
         lower.chapters.add(first_chap);
 
         for expr in body_stmts {
@@ -292,11 +294,13 @@ impl<'a> LowerAsyncIf<'a> {
 fn serialize_chapters(f: hir::Function, chapters: Chapters) -> Vec<hir::Function> {
     let mut funcs = vec![];
     for chap in chapters.chaps {
-        let mut new_f = f.clone();
-        new_f.name = chap.name;
-        new_f.params = chap.params;
-        new_f.body_stmts = chap.stmts;
-        funcs.push(new_f);
+        funcs.push(hir::Function {
+            generated: chap.generated,
+            name: chap.name,
+            params: chap.params,
+            body_stmts: chap.stmts,
+            ..f.clone()
+        });
     }
     funcs
 }

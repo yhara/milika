@@ -86,6 +86,7 @@ impl fmt::Display for Extern {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub generated: bool,
     pub asyncness: Asyncness,
     pub name: String,
     pub params: Vec<Param>,
@@ -95,6 +96,7 @@ pub struct Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let gen = if self.generated { "." } else { "" };
         let para = self
             .params
             .iter()
@@ -103,8 +105,8 @@ impl fmt::Display for Function {
             .join(", ");
         write!(
             f,
-            "fun {}{}({}) -> {} {{\n",
-            self.name, self.asyncness, para, self.ret_ty
+            "fun{} {}{}({}) -> {} {{\n",
+            gen, self.name, self.asyncness, para, self.ret_ty
         )?;
         for expr in &self.body_stmts {
             write!(f, "  {}  #-> {}\n", &expr.0, &expr.1)?;
