@@ -37,15 +37,13 @@ use crate::hir;
 use anyhow::{anyhow, Result};
 use std::collections::VecDeque;
 
-pub fn run(hir: hir::Program) -> Result<hir::split::Program> {
+pub fn run(hir: hir::Program) -> Result<hir::Program> {
     let mut funcs = vec![];
     for f in hir.funcs {
-        funcs.push(compile_func(f)?);
+        let mut split_funcs = compile_func(f)?;
+        funcs.append(&mut split_funcs);
     }
-    Ok(hir::split::Program {
-        externs: hir.externs,
-        funcs,
-    })
+    Ok(hir::Program { funcs, ..hir })
 }
 
 #[derive(Debug)]

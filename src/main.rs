@@ -70,28 +70,25 @@ impl Main {
         };
         let mut hir = hir::untyped::create(&ast)?;
         hir::typing::run(&mut hir)?;
-        let shir = if is_prelude {
-            hir.into()
-        } else {
+        if !is_prelude {
             self.debug(format!("# -- typing output --\n{hir}\n"), !is_prelude);
-            let shir = hir_lowering::lower_async_if::run(hir)?;
+            hir = hir_lowering::lower_async_if::run(hir)?;
             self.debug(
-                format!("# -- lower_async_if output --\n{shir}\n"),
+                format!("# -- lower_async_if output --\n{hir}\n"),
                 !is_prelude,
             );
-            let shir = hir::asyncness_check::run(shir);
+            hir = hir::asyncness_check::run(hir);
             self.debug(
                 format!("# -- asyncness_check output --\n{hir}\n"),
                 !is_prelude,
             );
-            let shir = hir_lowering::async_splitter::run(shir)?;
+            hir = hir_lowering::async_splitter::run(hir)?;
             self.debug(
                 format!("# -- async_splitter output --\n{hir}\n"),
                 !is_prelude,
             );
-            shir
-        };
-        let bhir = hir_lowering::lower_if::run(shir);
+        }
+        let bhir = hir_lowering::lower_if::run(hir);
         Ok(bhir)
     }
 
