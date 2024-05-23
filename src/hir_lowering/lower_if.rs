@@ -78,9 +78,9 @@ impl Compiler {
     }
 
     fn compile_func(&mut self, body_stmts: Vec<hir::TypedExpr>) {
-        let new_stmts = self.walk_exprs(body_stmts).unwrap();
-        for e in new_stmts {
-            self.push(e);
+        for s in body_stmts {
+            let new_s = self.walk_expr(s).unwrap();
+            self.push(new_s);
         }
     }
 
