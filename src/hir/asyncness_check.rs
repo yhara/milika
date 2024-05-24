@@ -8,15 +8,19 @@ use std::collections::{HashMap, HashSet, VecDeque};
 /// This judgement is conservative because it is (possible, but) hard to
 /// tell if a function is async or not when we support first-class functions.
 /// It is safe to be false-positive (performance penalty aside).
-pub fn run(mut hir: hir::Program) -> hir::Program {
+pub fn run(mut shir: hir::split::Program) -> hir::split::Program {
     // Externs are known to be async or not
     let mut known = HashMap::new();
-    for e in &hir.externs {
+    for e in &shir.externs {
         known.insert(e.name.clone(), e.is_async);
     }
-    let funcs = hir.funcs.iter().map(|f| (f.name.clone(), f)).collect();
+    let funcs: HashMap<_, _> = shir
+        .funcs
+        .iter()
+        .flat_map(|group| group.iter().map(|f| (f.name.clone(), f)))
+        .collect();
 
-    let mut q = VecDeque::from(hir.funcs.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
+    let mut q = VecDeque::from(funcs.values().map(|f| f.name.clone()).collect::<Vec<_>>());
     let mut unresolved_deps = HashMap::new();
     while let Some(name) = q.pop_front() {
         if known.contains_key(&name) || unresolved_deps.contains_key(&name) {
@@ -37,16 +41,18 @@ pub fn run(mut hir: hir::Program) -> hir::Program {
 
     // Apply the result
     let mut u = Update { known: &known };
-    u.set_func_asyncness(&mut hir);
-    let new_hir = u.walk_hir(hir).unwrap();
+    u.set_func_asyncness(&mut shir);
+    let new_shir = u.walk_shir(shir).unwrap();
 
     // Consistency check
-    for f in &new_hir.funcs {
-        let mut a = Assert::new();
-        debug_assert!(a.check_func(f));
+    for group in &new_shir.funcs {
+        for f in group {
+            let mut a = Assert::new();
+            debug_assert!(a.check_func(f));
+        }
     }
 
-    new_hir
+    new_shir
 }
 
 /// Check if a function is async or not.
@@ -162,10 +168,12 @@ struct Update<'a> {
     known: &'a HashMap<String, bool>,
 }
 impl<'a> Update<'a> {
-    fn set_func_asyncness(&self, hir: &mut hir::Program) {
-        for f in &mut hir.funcs {
-            let is_async = self.known.get(&f.name).unwrap();
-            f.asyncness = (*is_async).into();
+    fn set_func_asyncness(&self, shir: &mut hir::split::Program) {
+        for group in &mut shir.funcs {
+            for f in group {
+                let is_async = self.known.get(&f.name).unwrap();
+                f.asyncness = (*is_async).into();
+            }
         }
     }
 }
