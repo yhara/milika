@@ -583,6 +583,13 @@ impl Expr {
     pub fn block_arg_ref(ty: Ty) -> TypedExpr {
         (Expr::BlockArgRef, ty)
     }
+
+    pub fn is_async_fun_call(&self) -> bool {
+        match self {
+            Expr::FunCall(fexpr, _args) => fexpr.1.is_async_fun(),
+            _ => false,
+        }
+    }
 }
 
 pub fn yielded_ty(stmts: &[TypedExpr]) -> Ty {

@@ -48,7 +48,7 @@ pub fn run(program: hir::split::Program) -> blocked::Program {
         .funcs
         .into_iter()
         .flat_map(|group| {
-            group.iter().map(|f| {
+            group.into_iter().map(|f| {
                 let mut c = Compiler::new(&f);
                 c.compile_func(f.body_stmts);
                 blocked::Function {

@@ -24,6 +24,10 @@ const N_ASYNC_PARAMS: usize = 2;
 
 #[derive(Debug)]
 struct AsyncSplitter {
+    // True if the original Milika function (i.e. the function at the beginning of the group) is async
+    origin_is_async: bool,
+    // True if compiling the last function in the group
+    last_in_group: bool,
     chapters: VecDeque<Chapter>,
 }
 
@@ -45,8 +49,8 @@ impl Chapter {
 
 /// Splits asynchronous Milika func into multiple funcs.
 /// Also, signatures of async externs are modified to take `$env` and `$cont` as the first two params.
-pub fn run(hir: hir::Program) -> Result<hir::Program> {
-    let externs = hir
+pub fn run(shir: hir::split::Program) -> Result<hir::split::Program> {
+    let externs = shir
         .externs
         .into_iter()
         .map(|e| {
@@ -63,18 +67,32 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
         .collect();
 
     let mut c = AsyncSplitter {
+        origin_is_async: false,
+        last_in_group: false,
         chapters: Default::default(),
     };
     let mut funcs = vec![];
-    for f in hir.funcs {
-        let mut split_funcs = c.compile_func(f)?;
-        funcs.append(&mut split_funcs);
+    for group in shir.funcs {
+        let group_size = group.len();
+        let origin_is_async = group.first().unwrap().asyncness.is_async();
+        for (i, f) in group.into_iter().enumerate() {
+            let last_in_group = i == group_size - 1;
+            let split_funcs = c.compile_func(f, last_in_group, origin_is_async)?;
+            funcs.push(split_funcs);
+        }
     }
-    Ok(hir::Program { externs, funcs })
+    Ok(hir::split::Program::new(externs, funcs))
 }
 
 impl AsyncSplitter {
-    fn compile_func(&mut self, mut f: hir::Function) -> Result<Vec<hir::Function>> {
+    fn compile_func(
+        &mut self,
+        mut f: hir::Function,
+        last_in_group: bool,
+        origin_is_async: bool,
+    ) -> Result<Vec<hir::Function>> {
+        self.origin_is_async = origin_is_async;
+        self.last_in_group = last_in_group;
         self.chapters.clear();
         self.chapters.push_back(Chapter::new());
         for expr in f.body_stmts.drain(..).collect::<Vec<_>>() {
@@ -129,7 +147,12 @@ impl AsyncSplitter {
                         orig_func.ret_ty.clone().into(),
                     ),
                     ret_ty: hir::Ty::RustFuture,
-                    body_stmts,
+                    body_stmts: modify_return(
+                        self.origin_is_async,
+                        &orig_func,
+                        body_stmts,
+                        self.last_in_group,
+                    ),
                 }
             } else {
                 // The rest of the functions have a name like `foo_1`, `foo_2`, ...
@@ -143,7 +166,12 @@ impl AsyncSplitter {
                         hir::Param::new(last_chap_result_ty.unwrap(), "$async_result"),
                     ],
                     ret_ty: hir::Ty::RustFuture,
-                    body_stmts: chap.stmts,
+                    body_stmts: modify_return(
+                        self.origin_is_async,
+                        &orig_func,
+                        chap.stmts,
+                        self.last_in_group,
+                    ),
                 }
             };
             i += 1;
@@ -236,7 +264,7 @@ impl AsyncSplitter {
             hir::Expr::Alloc(_) => e,
             hir::Expr::Return(expr) => {
                 let new_expr = self.compile_expr(orig_func, *expr, true)?;
-                hir::Expr::return_(modify_async_return(orig_func, new_expr))
+                hir::Expr::return_(new_expr)
             }
             hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
                 let new_cond = self.compile_expr(orig_func, *cond, false)?;
@@ -359,34 +387,77 @@ fn prepend_async_intro(
     push_calls
 }
 
-fn modify_async_return(orig_func: &hir::Function, value_expr: hir::TypedExpr) -> hir::TypedExpr {
-    if !orig_func.asyncness.is_async() {
-        return value_expr;
+/// Insert call of `chiika_env_pop` before the `return`.
+fn modify_return(
+    origin_is_async: bool,
+    orig_func: &hir::Function,
+    mut body_stmts: Vec<hir::TypedExpr>,
+    last_in_group: bool,
+) -> Vec<hir::TypedExpr> {
+    if !origin_is_async {
+        // No mod needed for a sync function
+        return body_stmts;
     }
-
-    let pop_cont = {
-        let cont_ty = hir::Ty::Fun(hir::FunTy {
-            asyncness: hir::Asyncness::Lowered,
-            param_tys: vec![hir::Ty::ChiikaEnv, orig_func.ret_ty.clone()],
-            ret_ty: Box::new(hir::Ty::RustFuture),
-        });
-        let n_pop = orig_func.params.len() + 1; // +1 for $cont
-        call_chiika_env_pop(n_pop, cont_ty)
+    // Remove the `return` stmt
+    let Some((hir::Expr::Return(value_expr), _)) = body_stmts.pop() else {
+        panic!("expected return as the last stmt");
     };
-
-    if let hir::Expr::FunCall(fexpr, args) = &value_expr.0 {
-        if fexpr.1.is_async_fun() {
-            // Pass the popped continuation to the async callee
-            let mut new_args = args.clone();
-            new_args.insert(0, arg_ref_env());
-            new_args.insert(1, pop_cont);
-            let new_fexpr = (fexpr.0.clone(), async_fun_ty(fexpr.1.as_fun_ty()).into());
-            return hir::Expr::fun_call(new_fexpr, new_args);
+    // Call chiika_env_pop before leaving the origin func
+    let new_ret_value = if last_in_group {
+        let env_pop = {
+            // FIXME: This is not always correct. Should be the number of params of the group first function
+            let n_pop = orig_func.params.len() + 1; // +1 for $cont
+            let cont_ty = hir::Ty::Fun(hir::FunTy {
+                asyncness: hir::Asyncness::Lowered,
+                param_tys: vec![hir::Ty::ChiikaEnv, orig_func.ret_ty.clone()],
+                ret_ty: Box::new(hir::Ty::RustFuture),
+            });
+            call_chiika_env_pop(n_pop, cont_ty)
+        };
+        if value_expr.0.is_async_fun_call() {
+            // Convert `callee(args...)`
+            // to `callee(env, env_pop(), args...)`
+            let hir::Expr::FunCall(fexpr, mut args) = value_expr.0 else {
+                unreachable!();
+            };
+            args.insert(0, arg_ref_env());
+            args.insert(1, env_pop);
+            let new_fexpr = (fexpr.0, async_fun_ty(fexpr.1.as_fun_ty()).into());
+            hir::Expr::fun_call(new_fexpr, args)
+        } else {
+            // `(env_pop())(env, value)`
+            hir::Expr::fun_call(env_pop, vec![arg_ref_env(), *value_expr])
         }
-    }
+    } else if matches!(value_expr.0, hir::Expr::If(..)) {
+        // Already lowered on CondReturn -> If
+        *value_expr
+    } else {
+        let hir::Expr::FunCall(fexpr, mut args) = value_expr.0 else {
+            panic!("[BUG] expected fun call:  {:?}", value_expr.0);
+        };
+        if fexpr.1.as_fun_ty().asyncness == hir::Asyncness::Lowered {
+            // Already lowered
+            hir::Expr::fun_call(*fexpr, args)
+        } else {
+            // Convert `return foo'e(ifResult)`
+            // to `return foo'e(env, ifResult)`
+            args.insert(0, arg_ref_env());
 
-    // Pass the value to the continuation
-    hir::Expr::fun_call(pop_cont, vec![arg_ref_env(), value_expr])
+            let new_fun_ty = {
+                let mut param_tys = fexpr.1.into_fun_ty().param_tys.clone();
+                param_tys.insert(0, hir::Ty::ChiikaEnv);
+                hir::FunTy {
+                    asyncness: hir::Asyncness::Lowered,
+                    param_tys,
+                    ret_ty: Box::new(hir::Ty::RustFuture),
+                }
+            };
+            let new_fexpr = (fexpr.0, new_fun_ty.into());
+            hir::Expr::fun_call(new_fexpr, args)
+        }
+    };
+    body_stmts.push(hir::Expr::return_(new_ret_value));
+    body_stmts
 }
 
 fn modify_cond_call(

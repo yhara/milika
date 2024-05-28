@@ -1,5 +1,8 @@
 //! Split `if` statements with (possible) async call into multiple functions.
 //!
+//! PERF: Currently all `if`s are converted but it may be kept as-is
+//! if has no async call in it.
+//!
 //! Example:
 //! ```
 //! // Before

@@ -26,6 +26,11 @@ pub fn run(mut shir: hir::split::Program) -> hir::split::Program {
         if known.contains_key(&name) || unresolved_deps.contains_key(&name) {
             continue;
         }
+        // HACK: force endif-functions to be marked as async
+        if name.ends_with("'e") {
+            known.insert(name.clone(), true);
+            continue;
+        }
         Check::run(
             &funcs,
             &name,
@@ -217,10 +222,10 @@ impl Assert {
 
     fn check_func(&mut self, f: &hir::Function) -> bool {
         self.walk_exprs(&f.body_stmts).unwrap();
-        if f.asyncness.is_async() != self.found_async_call {
+        if self.found_async_call && !f.asyncness.is_async() {
             panic!(
-                "Function {} is marked as async={}, but found_async_call is {}",
-                f.name, f.asyncness, self.found_async_call
+                "Function {} is marked as sync, but found async call",
+                f.name
             );
         }
         true

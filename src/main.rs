@@ -81,12 +81,12 @@ impl Main {
             );
             let shir = hir::asyncness_check::run(shir);
             self.debug(
-                format!("# -- asyncness_check output --\n{hir}\n"),
+                format!("# -- asyncness_check output --\n{shir}\n"),
                 !is_prelude,
             );
             let shir = hir_lowering::async_splitter::run(shir)?;
             self.debug(
-                format!("# -- async_splitter output --\n{hir}\n"),
+                format!("# -- async_splitter output --\n{shir}\n"),
                 !is_prelude,
             );
             shir
