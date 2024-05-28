@@ -42,5 +42,8 @@ pub extern "C" fn chiika_env_pop(env: *mut ChiikaEnv, n: i64) -> i64 {
 #[no_mangle]
 pub extern "C" fn chiika_env_ref(env: *mut ChiikaEnv, n: i64) -> i64 {
     let stack = unsafe { &(*env).stack };
+    if n > (stack.len() as i64) - 1 {
+        panic!("[BUG;chiika_env_ref] Stack underflow: tried to peek {}-th item, but only {} items left", n, stack.len());
+    }
     stack[stack.len() - 1 - (n as usize)]
 }
