@@ -42,10 +42,7 @@ pub fn run(hir: hir::Program) -> Result<hir::split::Program> {
     for f in hir.funcs {
         funcs.push(compile_func(f)?);
     }
-    Ok(hir::split::Program {
-        externs: hir.externs,
-        funcs,
-    })
+    Ok(hir::split::Program::new(hir.externs, funcs))
 }
 
 #[derive(Debug)]

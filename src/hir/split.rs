@@ -7,18 +7,19 @@ pub struct Program {
     // Grouped by the original function. Group size is one if the original
     // is a sync function.
     pub funcs: Vec<Vec<hir::Function>>,
+    _marker: std::marker::PhantomData<*const ()>,
 }
 
 impl From<hir::Program> for Program {
     fn from(hir_program: hir::Program) -> Self {
-        Program {
-            externs: hir_program.externs,
-            funcs: hir_program
+        Self::new(
+            hir_program.externs,
+            hir_program
                 .funcs
                 .into_iter()
                 .map(|func| vec![func])
                 .collect(),
-        }
+        )
     }
 }
 
@@ -39,7 +40,11 @@ impl fmt::Display for Program {
 impl Program {
     pub fn new(externs: Vec<hir::Extern>, funcs: Vec<Vec<hir::Function>>) -> Self {
         debug_assert!(has_uniq_names(&funcs));
-        Program { externs, funcs }
+        Program {
+            externs,
+            funcs,
+            _marker: std::marker::PhantomData,
+        }
     }
 }
 

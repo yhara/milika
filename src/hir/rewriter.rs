@@ -27,7 +27,7 @@ pub trait HirRewriter {
             }
             funcs.push(new_group);
         }
-        Ok(hir::split::Program { funcs, ..shir })
+        Ok(hir::split::Program::new(shir.externs, funcs))
     }
 
     fn walk_exprs(&mut self, exprs: Vec<hir::TypedExpr>) -> Result<Vec<hir::TypedExpr>> {
