@@ -538,7 +538,7 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
     let fun_ty = hir::FunTy {
         asyncness: hir::Asyncness::Lowered,
         param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any],
-        ret_ty: Box::new(hir::Ty::Int),
+        ret_ty: Box::new(hir::Ty::Null),
     };
     hir::Expr::fun_call(
         hir::Expr::func_ref("chiika_env_push", fun_ty),
