@@ -26,11 +26,6 @@ pub fn run(mut shir: hir::split::Program) -> hir::split::Program {
         if known.contains_key(&name) || unresolved_deps.contains_key(&name) {
             continue;
         }
-        // HACK: force endif-functions to be marked as async
-        if name.ends_with("'e") {
-            known.insert(name.clone(), true);
-            continue;
-        }
         Check::run(
             &funcs,
             &name,
@@ -91,7 +86,12 @@ impl<'a> Check<'a> {
         let func = funcs.get(fname).unwrap();
         c.walk_exprs(&func.body_stmts).unwrap();
         if c.depends.is_empty() {
-            c.known.insert(fname.to_string(), c.is_async);
+            let mut is_async = c.is_async;
+            // HACK: force endif-functions to be marked as async
+            if fname.ends_with("'e") {
+                is_async = true;
+            }
+            c.known.insert(fname.to_string(), is_async);
         } else {
             c.unresolved_deps.insert(fname.to_string(), c.depends);
         }
