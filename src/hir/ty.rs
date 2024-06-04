@@ -76,6 +76,14 @@ impl Ty {
             _ => panic!("[BUG] not a function type: {:?}", self),
         }
     }
+
+    /// Returns true if the two function types are the same except for asyncness.
+    pub fn same(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Ty::Fun(f1), Ty::Fun(f2)) => f1.same(f2),
+            _ => self == other,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -137,6 +145,12 @@ impl TryFrom<ast::FunTy> for FunTy {
 impl FunTy {
     /// Returns true if the two function types are the same except for asyncness.
     pub fn same(&self, other: &Self) -> bool {
-        self.param_tys == other.param_tys && self.ret_ty == other.ret_ty
+        self.ret_ty.same(&other.ret_ty)
+            && self.param_tys.len() == other.param_tys.len()
+            && self
+                .param_tys
+                .iter()
+                .zip(other.param_tys.iter())
+                .all(|(a, b)| a.same(b))
     }
 }
