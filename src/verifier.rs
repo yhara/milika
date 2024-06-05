@@ -41,7 +41,11 @@ impl Verifier {
             hir::Expr::Number(_) => assert(&e, "number", &hir::Ty::Int)?,
             hir::Expr::PseudoVar(_) => (),
             hir::Expr::LVarRef(_) => (),
-            hir::Expr::ArgRef(_) => (),
+            hir::Expr::ArgRef(idx) => {
+                if *idx >= f.params.len() {
+                    bail!("argument index out of range: {}", idx);
+                }
+            }
             hir::Expr::FuncRef(name) => {
                 let ty_expected = self
                     .sigs
@@ -128,6 +132,9 @@ impl Verifier {
                 self.verify_expr(f, fexpr_f)?;
                 self.verify_exprs(f, args_f)?;
             }
+            hir::Expr::Branch(_, expr) => {
+                self.verify_expr(f, expr)?;
+            }
             hir::Expr::Br(e, n) => {
                 if *n >= f.body_blocks.len() {
                     bail!("block index out of range: {}", n);
@@ -144,6 +151,7 @@ impl Verifier {
                 }
             }
             hir::Expr::BlockArgRef => (),
+            _ => panic!("not supported by verifier: {:?}", e.0),
         }
         Ok(())
     }

@@ -19,7 +19,10 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
+
+    //
     // Appears after `lower_async_if`
+    //
     CondReturn(
         Box<Typed<Expr>>,
         Box<Typed<Expr>>,
@@ -27,7 +30,19 @@ pub enum Expr {
         Box<Typed<Expr>>,
         Vec<Typed<Expr>>,
     ),
+    // Represents unconditional branch to endif-function
+    Branch(String, Box<Typed<Expr>>),
+    GetIfResult,
+
+    //
+    // Appears during async_splitter
+    //
+    // Terminates a function and converted to `Return` eventually
+    AsyncCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
+
+    //
     // Appears after `lower_if`
+    //
     Br(Box<Typed<Expr>>, usize),
     CondBr(Box<Typed<Expr>>, usize, usize),
     BlockArgRef,
@@ -122,6 +137,20 @@ impl std::fmt::Display for Expr {
                     "cond_return {}, {}{}(...), {}{}(...)",
                     cond.0, fexpr_t.0, fun_ty_t.asyncness, fexpr_f.0, fun_ty_f.asyncness
                 )
+            }
+            Expr::Branch(name, e) => write!(f, "branch {}({})", name, e.0),
+            Expr::AsyncCall(func, args) => {
+                let Ty::Fun(fun_ty) = &func.1 else {
+                    panic!("[BUG] not a function: {:?}", func);
+                };
+                write!(f, "async_call {}{}(", func.0, fun_ty.asyncness)?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", arg.0)?;
+                }
+                write!(f, ")")
             }
             Expr::Br(e, target) => write!(f, "%br ^bb{}({})  # {}", target, e.0, e.1),
             Expr::CondBr(cond, target_t, target_f) => {
@@ -241,6 +270,14 @@ impl Expr {
             ),
             Ty::Void,
         )
+    }
+
+    pub fn branch(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
+        (Expr::Branch(name.into(), Box::new(e)), Ty::Void)
+    }
+
+    pub fn async_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
+        (Expr::AsyncCall(Box::new(func), args), Ty::RustFuture)
     }
 
     pub fn br(value: TypedExpr, target: usize) -> TypedExpr {

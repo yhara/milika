@@ -25,11 +25,11 @@
 //! }
 //! fun foo't() -> Foo {
 //!     b ...
-//!     return foo'e(c)
+//!     branch foo'e(c)
 //! }
 //! fun foo'f() -> Foo {
 //!     d ...
-//!     return foo'e(e)
+//!     branch foo'e(e)
 //! }
 //! fun foo'e(x) -> Foo {
 //!     ...
@@ -245,8 +245,7 @@ impl<'a> LowerAsyncIf<'a> {
         }
         if let Some(vexpr) = opt_vexpr {
             let new_vexpr = self.compile_value_expr(*vexpr)?;
-            let (fexpr, args) = self.goto_call(&endif_chap_name, Some(new_vexpr));
-            let goto_endif = hir::Expr::return_(hir::Expr::fun_call(fexpr, args));
+            let goto_endif = hir::Expr::branch(endif_chap_name, new_vexpr);
             clause_chap.add_stmt(goto_endif);
         }
         Ok(())
@@ -298,6 +297,7 @@ fn serialize_chapters(f: hir::Function, chapters: Chapters) -> Vec<hir::Function
     for chap in chapters.chaps {
         funcs.push(hir::Function {
             generated: chap.generated,
+            asyncness: hir::Asyncness::Async,
             name: chap.name,
             params: chap.params,
             body_stmts: chap.stmts,
