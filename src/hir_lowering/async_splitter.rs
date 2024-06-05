@@ -26,8 +26,6 @@ const N_ASYNC_PARAMS: usize = 2;
 struct AsyncSplitter {
     // True if the original Milika function (i.e. the function at the beginning of the group) is async
     origin_is_async: bool,
-    // True if compiling the last function in the group
-    last_in_group: bool,
     chapters: VecDeque<Chapter>,
 }
 
@@ -68,16 +66,13 @@ pub fn run(shir: hir::split::Program) -> Result<hir::split::Program> {
 
     let mut c = AsyncSplitter {
         origin_is_async: false,
-        last_in_group: false,
         chapters: Default::default(),
     };
     let mut funcs = vec![];
     for group in shir.funcs {
-        let group_size = group.len();
         let origin_is_async = group.first().unwrap().asyncness.is_async();
-        for (i, f) in group.into_iter().enumerate() {
-            let last_in_group = i == group_size - 1;
-            let split_funcs = c.compile_func(f, last_in_group, origin_is_async)?;
+        for f in group {
+            let split_funcs = c.compile_func(f, origin_is_async)?;
             funcs.push(split_funcs);
         }
     }
@@ -88,11 +83,9 @@ impl AsyncSplitter {
     fn compile_func(
         &mut self,
         mut f: hir::Function,
-        last_in_group: bool,
         origin_is_async: bool,
     ) -> Result<Vec<hir::Function>> {
         self.origin_is_async = origin_is_async;
-        self.last_in_group = last_in_group;
         self.chapters.clear();
         self.chapters.push_back(Chapter::new());
         for expr in f.body_stmts.drain(..).collect::<Vec<_>>() {
@@ -148,12 +141,7 @@ impl AsyncSplitter {
                         orig_func.generated,
                     ),
                     ret_ty: hir::Ty::RustFuture,
-                    body_stmts: modify_return(
-                        self.origin_is_async,
-                        &orig_func,
-                        body_stmts,
-                        self.last_in_group,
-                    ),
+                    body_stmts: modify_return(self.origin_is_async, &orig_func, body_stmts),
                 }
             } else {
                 // The rest of the functions have a name like `foo_1`, `foo_2`, ...
@@ -167,12 +155,7 @@ impl AsyncSplitter {
                         hir::Param::new(last_chap_result_ty.unwrap(), "$async_result"),
                     ],
                     ret_ty: hir::Ty::RustFuture,
-                    body_stmts: modify_return(
-                        self.origin_is_async,
-                        &orig_func,
-                        chap.stmts,
-                        self.last_in_group,
-                    ),
+                    body_stmts: modify_return(self.origin_is_async, &orig_func, chap.stmts),
                 }
             };
             i += 1;
@@ -408,7 +391,6 @@ fn modify_return(
     origin_is_async: bool,
     orig_func: &hir::Function,
     mut body_stmts: Vec<hir::TypedExpr>,
-    last_in_group: bool,
 ) -> Vec<hir::TypedExpr> {
     if !origin_is_async {
         // No mod needed for a sync function
@@ -448,7 +430,6 @@ fn modify_return(
             hir::Expr::fun_call(new_fexpr, args)
         }
         Some((hir::Expr::Return(value_expr), _)) => {
-            debug_assert!(last_in_group);
             let env_pop = {
                 // FIXME: This is not always correct. Should be the number of params of the group first function
                 let n_pop = orig_func.params.len() + 1; // +1 for $cont
