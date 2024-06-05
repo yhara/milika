@@ -14,6 +14,19 @@ pub fn run(mut shir: hir::split::Program) -> hir::split::Program {
     for e in &shir.externs {
         known.insert(e.name.clone(), e.is_async);
     }
+    for f in &shir.funcs {
+        for f in f {
+            match f.asyncness {
+                hir::Asyncness::Async => {
+                    known.insert(f.name.clone(), true);
+                }
+                hir::Asyncness::Sync => {
+                    known.insert(f.name.clone(), false);
+                }
+                _ => {}
+            }
+        }
+    }
     let funcs: HashMap<_, _> = shir
         .funcs
         .iter()
