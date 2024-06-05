@@ -1,9 +1,10 @@
 extern print(Int n) -> Null
-fun chiika_main() -> Null {
+
+fun chiika_main() -> Int {
   if (true) {
     print(456)
   } else {
     print(789)
   }
-  return null
+  return 0
 }

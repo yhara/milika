@@ -1,7 +1,7 @@
 extern print(Int n) -> Null
 extern(async) sleep_sec(Int n) -> Null
 
-fun chiika_main() -> Null {
+fun chiika_main() -> Int {
   print(
     if (true) {
       sleep_sec(1)
@@ -10,5 +10,5 @@ fun chiika_main() -> Null {
       yield 789
     }
   )
-  return null
+  return 0
 }
