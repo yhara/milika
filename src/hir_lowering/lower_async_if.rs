@@ -212,10 +212,7 @@ impl<'a> LowerAsyncIf<'a> {
             Ok(None)
         } else {
             self.chapters.add(endif_chap);
-            Ok(Some(hir::Expr::arg_ref(
-                self.orig_func.params.len(),
-                if_ty.clone(),
-            )))
+            Ok(Some(hir::Expr::get_if_result(if_ty.clone())))
         }
     }
 

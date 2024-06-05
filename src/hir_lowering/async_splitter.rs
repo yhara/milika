@@ -285,6 +285,7 @@ impl AsyncSplitter {
                 let if_result = self.compile_expr(orig_func, *expr, false)?;
                 hir::Expr::branch(fname, if_result)
             }
+            hir::Expr::GetIfResult => hir::Expr::arg_ref(1, e.1),
             _ => panic!("[BUG] unexpected for async_splitter: {:?}", e.0),
         };
         Ok(new_e)

@@ -139,24 +139,13 @@ impl std::fmt::Display for Expr {
                 )
             }
             Expr::Branch(name, e) => write!(f, "branch {}({})", name, e.0),
-            Expr::AsyncCall(func, args) => {
-                let Ty::Fun(fun_ty) = &func.1 else {
-                    panic!("[BUG] not a function: {:?}", func);
-                };
-                write!(f, "async_call {}{}(", func.0, fun_ty.asyncness)?;
-                for (i, arg) in args.iter().enumerate() {
-                    if i != 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", arg.0)?;
-                }
-                write!(f, ")")
-            }
+            Expr::GetIfResult => write!(f, "%get_if_result"),
             Expr::Br(e, target) => write!(f, "%br ^bb{}({})  # {}", target, e.0, e.1),
             Expr::CondBr(cond, target_t, target_f) => {
                 write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
             }
             Expr::BlockArgRef => write!(f, "%block_arg"),
+            _ => todo!("{:?}", self),
         }
     }
 }
@@ -274,6 +263,10 @@ impl Expr {
 
     pub fn branch(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
         (Expr::Branch(name.into(), Box::new(e)), Ty::Void)
+    }
+
+    pub fn get_if_result(ty: Ty) -> TypedExpr {
+        (Expr::GetIfResult, ty)
     }
 
     pub fn async_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
