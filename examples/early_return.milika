@@ -5,7 +5,7 @@ fun chiika_main() -> Int {
   if (true) {
     sleep_sec(1)
     print(123)
-    return null
+    return 0
   }
   print(456)
   return 0
