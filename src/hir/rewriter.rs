@@ -70,7 +70,7 @@ pub trait HirRewriter {
                 )
             }
             hir::Expr::Branch(name, expr) => hir::Expr::branch(name, self.walk_expr(*expr)?),
-            hir::Expr::GetIfResult => expr,
+            hir::Expr::EnvRef(_) => expr,
             _ => panic!("not supported by hir::rewriter: {:?}", expr),
         };
         self.rewrite_expr(new_expr)

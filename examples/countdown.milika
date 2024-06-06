@@ -1,0 +1,15 @@
+extern print(Int n) -> Null
+extern(async) sleep_sec(Int n) -> Null
+
+fun countdown(Int i) -> Null {
+  print(i)
+  if (i == 0) {
+    return null
+  }
+  return countdown(i - 1)
+}
+
+fun chiika_main() -> Int {
+  countdown(3)
+  return 0
+}

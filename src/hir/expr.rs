@@ -32,7 +32,7 @@ pub enum Expr {
     ),
     // Represents unconditional branch to endif-function
     Branch(String, Box<Typed<Expr>>),
-    GetIfResult,
+    EnvRef(usize),
 
     //
     // Appears during async_splitter
@@ -139,7 +139,7 @@ impl std::fmt::Display for Expr {
                 )
             }
             Expr::Branch(name, e) => write!(f, "branch {}({})", name, e.0),
-            Expr::GetIfResult => write!(f, "%get_if_result"),
+            Expr::EnvRef(idx) => write!(f, "%env[{}]", idx),
             Expr::Br(e, target) => write!(f, "%br ^bb{}({})  # {}", target, e.0, e.1),
             Expr::CondBr(cond, target_t, target_f) => {
                 write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
@@ -265,8 +265,8 @@ impl Expr {
         (Expr::Branch(name.into(), Box::new(e)), Ty::Void)
     }
 
-    pub fn get_if_result(ty: Ty) -> TypedExpr {
-        (Expr::GetIfResult, ty)
+    pub fn env_ref(idx: usize, ty: Ty) -> TypedExpr {
+        (Expr::EnvRef(idx), ty)
     }
 
     pub fn async_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {

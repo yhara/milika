@@ -144,7 +144,7 @@ impl<'a> LowerAsyncIf<'a> {
             hir::Expr::PseudoVar(_) => e,
             hir::Expr::LVarRef(_) => e,
             hir::Expr::Assign(name, rhs) => hir::Expr::assign(name, self.compile_value_expr(*rhs)?),
-            hir::Expr::ArgRef(_) => e,
+            hir::Expr::ArgRef(idx) => hir::Expr::env_ref(idx, e.1),
             hir::Expr::FuncRef(_) => e,
             hir::Expr::OpCall(op, lhs, rhs) => hir::Expr::op_call(
                 op,
@@ -188,14 +188,13 @@ impl<'a> LowerAsyncIf<'a> {
         let func_name = self.chapters.current_name().to_string();
 
         let new_cond_expr = self.compile_value_expr(cond_expr)?;
-        let mut then_chap = Chapter::new_suffixed(&func_name, "t", self.orig_func.params.clone());
-        let mut else_chap = Chapter::new_suffixed(&func_name, "f", self.orig_func.params.clone());
+        let mut then_chap = Chapter::new_suffixed(&func_name, "t", vec![]);
+        let mut else_chap = Chapter::new_suffixed(&func_name, "f", vec![]);
         // Statements after `if` goes to an "endif" chapter
-        let mut endif_params = self.orig_func.params.clone();
-        endif_params.push(hir::Param {
+        let endif_params = vec![hir::Param {
             name: "$ifResult".to_string(),
             ty: if_ty.clone(),
-        });
+        }];
         let endif_chap = Chapter::new_suffixed(&func_name, "e", endif_params); // e for endif
 
         self.compile_clause(&mut then_chap, then_exprs, &endif_chap.name)?;
@@ -212,7 +211,7 @@ impl<'a> LowerAsyncIf<'a> {
             Ok(None)
         } else {
             self.chapters.add(endif_chap);
-            Ok(Some(hir::Expr::get_if_result(if_ty.clone())))
+            Ok(Some(hir::Expr::arg_ref(0, if_ty.clone())))
         }
     }
 
@@ -255,17 +254,10 @@ impl<'a> LowerAsyncIf<'a> {
         to_endif: Option<hir::TypedExpr>,
     ) -> (hir::TypedExpr, Vec<hir::TypedExpr>) {
         let mut args = self
-            .orig_func
-            .params
+            .allocs
             .iter()
-            .enumerate()
-            .map(|(i, param)| hir::Expr::arg_ref(i, param.ty.clone()))
+            .map(|(name, ty)| hir::Expr::lvar_ref(name.clone(), ty.clone()))
             .collect::<Vec<_>>();
-        args.extend(
-            self.allocs
-                .iter()
-                .map(|(name, ty)| hir::Expr::lvar_ref(name.clone(), ty.clone())),
-        );
         let mut t = None;
         if let Some(expr) = to_endif {
             t = Some(expr.1.clone());
@@ -276,8 +268,11 @@ impl<'a> LowerAsyncIf<'a> {
     }
 
     fn chapter_fun_ty(&self, endif: Option<hir::Ty>) -> hir::FunTy {
-        let mut param_tys = self.orig_func.fun_ty().param_tys.clone();
-        param_tys.extend(self.allocs.iter().map(|(_, ty)| ty.clone()));
+        let mut param_tys = self
+            .allocs
+            .iter()
+            .map(|(_, ty)| ty.clone())
+            .collect::<Vec<_>>();
         if let Some(t) = endif {
             param_tys.push(t);
         }

@@ -78,7 +78,7 @@ pub trait HirVisitor {
             hir::Expr::Branch(_, expr) => {
                 self.walk_expr(expr)?;
             }
-            hir::Expr::GetIfResult => {}
+            hir::Expr::EnvRef(_) => {}
             hir::Expr::Br(_, _) => {}
             hir::Expr::CondBr(expr, _, _) => {
                 self.walk_expr(expr)?;
