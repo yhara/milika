@@ -1,7 +1,7 @@
 /// Returns the functions needed to run the Milika program.
 pub fn prelude_funcs(main_is_async: bool) -> String {
     let main_sig = if main_is_async {
-        "extern(internal) chiika_main(ENV env, FN((ENV,Int)->FUTURE) cont) -> FUTURE"
+        "extern(internal) chiika_main(ENV env, FN((ENV, Int)->FUTURE) cont) -> FUTURE"
     } else {
         "extern(internal) chiika_main() -> Int"
     };

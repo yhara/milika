@@ -211,7 +211,8 @@ impl<'a> LowerAsyncIf<'a> {
             Ok(None)
         } else {
             self.chapters.add(endif_chap);
-            Ok(Some(hir::Expr::arg_ref(0, if_ty.clone())))
+            // FIXME: This magic number is decided by async_splitter.rs
+            Ok(Some(hir::Expr::arg_ref(1, if_ty.clone())))
         }
     }
 

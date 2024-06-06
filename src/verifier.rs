@@ -45,6 +45,11 @@ impl Verifier {
                 if *idx >= f.params.len() {
                     bail!("argument index out of range: {}", idx);
                 }
+                assert(
+                    &e,
+                    "according to the function decalation",
+                    &f.params[*idx].ty,
+                )?;
             }
             hir::Expr::FuncRef(name) => {
                 let ty_expected = self
@@ -104,6 +109,7 @@ impl Verifier {
                 self.verify_expr(f, val)?;
                 match cast_type {
                     hir::CastType::AnyToFun(fun_ty) => {
+                        assert(&e, "cast type", &fun_ty.clone().into())?;
                         assert(&val, "castee", &hir::Ty::Any)?;
                         assert(&e, "result", &fun_ty.clone().into())?;
                     }
