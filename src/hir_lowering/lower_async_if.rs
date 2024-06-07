@@ -43,7 +43,7 @@ use std::collections::VecDeque;
 pub fn run(hir: hir::Program) -> Result<hir::split::Program> {
     let mut funcs = vec![];
     for f in hir.funcs {
-        funcs.push(compile_func(f)?);
+        funcs.push(vec![f]);
     }
     Ok(hir::split::Program::new(hir.externs, funcs))
 }
