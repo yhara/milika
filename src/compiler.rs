@@ -196,14 +196,12 @@ impl<'c> Compiler<'c> {
             hir::Expr::Cast(expr, cast_type) => {
                 self.compile_cast(blocks, block, lvars, expr, cast_type)
             }
-            hir::Expr::CondReturn(_, _, _, _, _) => {
-                panic!("CondReturn should be lowered before compiler.rs")
-            }
             hir::Expr::Br(expr, block_id) => self.compile_br(blocks, block, lvars, expr, block_id),
             hir::Expr::CondBr(cond, true_block_id, false_block_id) => {
                 self.compile_cond_br(blocks, block, lvars, cond, true_block_id, false_block_id)
             }
             hir::Expr::BlockArgRef => self.compile_block_arg_ref(block),
+            _ => panic!("should be lowered before compiler.rs: {:?}", texpr.0),
         }
     }
 

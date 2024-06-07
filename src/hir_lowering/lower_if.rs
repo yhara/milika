@@ -43,19 +43,21 @@ use crate::hir::blocked;
 use crate::hir::rewriter::HirRewriter;
 use anyhow::Result;
 
-pub fn run(program: hir::Program) -> blocked::Program {
+pub fn run(program: hir::split::Program) -> blocked::Program {
     let funcs = program
         .funcs
         .into_iter()
-        .map(|f| {
-            let mut c = Compiler::new(&f);
-            c.compile_func(f.body_stmts);
-            blocked::Function {
-                name: f.name,
-                params: f.params,
-                ret_ty: f.ret_ty,
-                body_blocks: c.blocks,
-            }
+        .flat_map(|group| {
+            group.into_iter().map(|f| {
+                let mut c = Compiler::new(&f);
+                c.compile_func(f.body_stmts);
+                blocked::Function {
+                    name: f.name,
+                    params: f.params,
+                    ret_ty: f.ret_ty,
+                    body_blocks: c.blocks,
+                }
+            })
         })
         .collect();
     blocked::Program {
@@ -78,9 +80,9 @@ impl Compiler {
     }
 
     fn compile_func(&mut self, body_stmts: Vec<hir::TypedExpr>) {
-        let new_stmts = self.walk_exprs(body_stmts).unwrap();
-        for e in new_stmts {
-            self.push(e);
+        for s in body_stmts {
+            let new_s = self.walk_expr(s).unwrap();
+            self.push(new_s);
         }
     }
 

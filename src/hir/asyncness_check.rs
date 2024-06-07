@@ -8,15 +8,32 @@ use std::collections::{HashMap, HashSet, VecDeque};
 /// This judgement is conservative because it is (possible, but) hard to
 /// tell if a function is async or not when we support first-class functions.
 /// It is safe to be false-positive (performance penalty aside).
-pub fn run(mut hir: hir::Program) -> hir::Program {
+pub fn run(mut shir: hir::split::Program) -> hir::split::Program {
     // Externs are known to be async or not
     let mut known = HashMap::new();
-    for e in &hir.externs {
+    for e in &shir.externs {
         known.insert(e.name.clone(), e.is_async);
     }
-    let funcs = hir.funcs.iter().map(|f| (f.name.clone(), f)).collect();
+    for f in &shir.funcs {
+        for f in f {
+            match f.asyncness {
+                hir::Asyncness::Async => {
+                    known.insert(f.name.clone(), true);
+                }
+                hir::Asyncness::Sync => {
+                    known.insert(f.name.clone(), false);
+                }
+                _ => {}
+            }
+        }
+    }
+    let funcs: HashMap<_, _> = shir
+        .funcs
+        .iter()
+        .flat_map(|group| group.iter().map(|f| (f.name.clone(), f)))
+        .collect();
 
-    let mut q = VecDeque::from(hir.funcs.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
+    let mut q = VecDeque::from(funcs.values().map(|f| f.name.clone()).collect::<Vec<_>>());
     let mut unresolved_deps = HashMap::new();
     while let Some(name) = q.pop_front() {
         if known.contains_key(&name) || unresolved_deps.contains_key(&name) {
@@ -37,16 +54,18 @@ pub fn run(mut hir: hir::Program) -> hir::Program {
 
     // Apply the result
     let mut u = Update { known: &known };
-    u.set_func_asyncness(&mut hir);
-    let new_hir = u.walk_hir(hir).unwrap();
+    u.set_func_asyncness(&mut shir);
+    let new_shir = u.walk_shir(shir).unwrap();
 
     // Consistency check
-    for f in &new_hir.funcs {
-        let mut a = Assert::new();
-        debug_assert!(a.check_func(f));
+    for group in &new_shir.funcs {
+        for f in group {
+            let mut a = Assert::new();
+            debug_assert!(a.check_func(f));
+        }
     }
 
-    new_hir
+    new_shir
 }
 
 /// Check if a function is async or not.
@@ -80,7 +99,12 @@ impl<'a> Check<'a> {
         let func = funcs.get(fname).unwrap();
         c.walk_exprs(&func.body_stmts).unwrap();
         if c.depends.is_empty() {
-            c.known.insert(fname.to_string(), c.is_async);
+            let mut is_async = c.is_async;
+            // HACK: force endif-functions to be marked as async
+            if fname.ends_with("'e") {
+                is_async = true;
+            }
+            c.known.insert(fname.to_string(), is_async);
         } else {
             c.unresolved_deps.insert(fname.to_string(), c.depends);
         }
@@ -162,10 +186,12 @@ struct Update<'a> {
     known: &'a HashMap<String, bool>,
 }
 impl<'a> Update<'a> {
-    fn set_func_asyncness(&self, hir: &mut hir::Program) {
-        for f in &mut hir.funcs {
-            let is_async = self.known.get(&f.name).unwrap();
-            f.asyncness = (*is_async).into();
+    fn set_func_asyncness(&self, shir: &mut hir::split::Program) {
+        for group in &mut shir.funcs {
+            for f in group {
+                let is_async = self.known.get(&f.name).unwrap();
+                f.asyncness = (*is_async).into();
+            }
         }
     }
 }
@@ -209,10 +235,10 @@ impl Assert {
 
     fn check_func(&mut self, f: &hir::Function) -> bool {
         self.walk_exprs(&f.body_stmts).unwrap();
-        if f.asyncness.is_async() != self.found_async_call {
+        if self.found_async_call && !f.asyncness.is_async() {
             panic!(
-                "Function {} is marked as async={}, but found_async_call is {}",
-                f.name, f.asyncness, self.found_async_call
+                "Function {} is marked as sync, but found async call",
+                f.name
             );
         }
         true

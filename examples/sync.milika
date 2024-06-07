@@ -1,5 +1,6 @@
 extern print(Int n) -> Null
-fun chiika_main() -> Null {
+
+fun chiika_main() -> Int {
   print(123)
-  return null
+  return 0
 }

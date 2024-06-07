@@ -1,11 +1,11 @@
 /// Returns the functions needed to run the Milika program.
 pub fn prelude_funcs(main_is_async: bool) -> String {
     let main_sig = if main_is_async {
-        "extern(internal) chiika_main(ENV env, FN((ENV,Int)->FUTURE) cont) -> FUTURE"
+        "extern(internal) chiika_main(ENV env, FN((ENV, Int)->FUTURE) cont) -> FUTURE"
     } else {
         "extern(internal) chiika_main() -> Int"
     };
-    let call_uesr_main = if main_is_async {
+    let call_user_main = if main_is_async {
         "return chiika_main(env, cont)"
     } else {
         "return cont(env, chiika_main())"
@@ -18,7 +18,7 @@ pub fn prelude_funcs(main_is_async: bool) -> String {
         extern chiika_env_ref(ENV env, Int n) -> Int
         extern chiika_start_tokio(Int n) -> Int
         fun chiika_start_user(ENV env, FN((ENV,Int)->FUTURE) cont) -> FUTURE {
-    " + call_uesr_main
+    " + call_user_main
         + "
         }
         fun main() -> Int {

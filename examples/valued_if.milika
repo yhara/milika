@@ -1,5 +1,6 @@
 extern print(Int n) -> Null
-fun chiika_main() -> Null {
+
+fun chiika_main() -> Int {
   print(
     if (true) {
       yield 456
@@ -7,6 +8,5 @@ fun chiika_main() -> Null {
       yield 789
     }
   )
-  return null
+  return 0
 }
-
