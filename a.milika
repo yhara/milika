@@ -11,16 +11,24 @@ extern(async) sleep_sec(Int n) -> Null
 #  return 0;
 #}
 
-fun countdown(Int i) -> Null {
-  print(i)
-  sleep_sec(1)
-  if (i == 0) {
-    return null
-  }
-  return countdown(i - 1)
-}
+#fun countdown(Int i) -> Null {
+#  print(i)
+#  sleep_sec(1)
+#  if (i == 0) {
+#    return null
+#  }
+#  return countdown(i - 1)
+#}
+#
+#fun chiika_main() -> Int {
+#  countdown(3)
+#  return 0
+#}
 
 fun chiika_main() -> Int {
-  countdown(3)
+  if (true) {
+    sleep_sec(1)
+    print(123)
+  }
   return 0
 }
