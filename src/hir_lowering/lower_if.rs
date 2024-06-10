@@ -99,18 +99,9 @@ impl HirRewriter for Compiler {
                 let id = self.blocks.len() - 1;
                 self.push(hir::Expr::cond_br(*cond, id + 1, id + 2));
 
-                let hir::Expr::Yield(v) = then_exprs.pop().unwrap().0 else {
-                    panic!("expected yield");
-                };
-                then_exprs.push(hir::Expr::br(*v, id + 3));
-                let then_block = blocked::Block::new(vec![], then_exprs);
+                let then_block = blocked::Block::new(vec![], modify_branch(then_exprs, id + 3));
                 self.blocks.push(then_block);
-
-                let hir::Expr::Yield(v) = else_exprs.pop().unwrap().0 else {
-                    panic!("expected yield");
-                };
-                else_exprs.push(hir::Expr::br(*v, id + 3));
-                let else_block = blocked::Block::new(vec![], else_exprs);
+                let else_block = blocked::Block::new(vec![], modify_branch(else_exprs, id + 3));
                 self.blocks.push(else_block);
 
                 let endif_block = blocked::Block::new_empty(vec![if_ty.clone()]);
@@ -120,4 +111,19 @@ impl HirRewriter for Compiler {
             _ => Ok(e),
         }
     }
+}
+
+/// Replace `yield` with `br` and `return` with `ret`.
+fn modify_branch(mut exprs: Vec<hir::TypedExpr>, to: usize) -> Vec<hir::TypedExpr> {
+    match exprs.pop().unwrap().0 {
+        hir::Expr::Return(v) => exprs.push(hir::Expr::return_(*v)),
+        hir::Expr::Yield(v) => {
+            exprs.push(hir::Expr::br(*v, to));
+        }
+        _ => panic!(
+            "[BUG] unexpected expr in modify_branch: {:?}",
+            exprs.last().unwrap().0
+        ),
+    }
+    exprs
 }
