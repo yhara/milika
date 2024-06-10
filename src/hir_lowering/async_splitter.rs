@@ -62,6 +62,9 @@ impl<'a> Compiler<'a> {
     /// Entry point for each milika function
     fn compile_func(&mut self) -> Result<Vec<hir::Function>> {
         self.chapters.add(Chapter::new_original(self.orig_func));
+        if self.orig_func.asyncness.is_async() {
+            self._compile_async_intro();
+        }
         for expr in self.orig_func.body_stmts.drain(..).collect::<Vec<_>>() {
             if let Some(new_expr) = self.compile_expr(expr, false)? {
                 self.chapters.add_stmt(new_expr);
@@ -73,24 +76,21 @@ impl<'a> Compiler<'a> {
             .into_iter()
             .map(|c| self._serialize_chapter(c))
             .collect())
-        //        if self.orig_func.asyncness.is_async() {
-        //            self._generate_split_funcs(chaps)
-        //        } else {
-        //            // Has no async call; no modification needed
-        //            Ok(vec![hir::Function {
-        //                generated: self.orig_func.generated,
-        //                asyncness: hir::Asyncness::Lowered,
-        //                name: self.orig_func.name.clone(),
-        //                params: self
-        //                    .orig_func
-        //                    .params
-        //                    .iter()
-        //                    .map(|x| x.clone().into())
-        //                    .collect(),
-        //                ret_ty: self.orig_func.ret_ty.clone().into(),
-        //                body_stmts: chaps.pop_front().unwrap().stmts,
-        //            }])
-        //        }
+    }
+
+    fn _compile_async_intro(&mut self) {
+        let arity = self.orig_func.params.len();
+        let mut push_items = vec![arg_ref_cont(arity, self.orig_func.ret_ty.clone())];
+        for i in (0..arity).rev() {
+            push_items.push(hir::Expr::arg_ref(
+                i + 1,
+                self.orig_func.params[i].ty.clone(),
+            ));
+            // +1 for $env
+        }
+        for arg in push_items {
+            self.chapters.add_stmt(call_chiika_env_push(arg));
+        }
     }
 
     fn _serialize_chapter(&self, chap: Chapter) -> hir::Function {
@@ -320,28 +320,6 @@ impl<'a> Compiler<'a> {
             hir::Expr::While(_cond_expr, _body_exprs) => todo!(),
             hir::Expr::Alloc(_) => e,
             hir::Expr::Return(expr) => self.compile_return(*expr)?,
-            //hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
-            //    let new_cond = self.compile_value_expr(*cond, false)?;
-            //    let new_fexpr_t = self.compile_value_expr(*fexpr_t, false)?;
-            //    let new_fexpr_f = self.compile_value_expr(*fexpr_f, false)?;
-            //    let new_args_t = args_t
-            //        .into_iter()
-            //        .map(|x| self.compile_value_expr(x, false))
-            //        .collect::<Result<Vec<_>>>()?;
-            //    let new_args_f = args_f
-            //        .into_iter()
-            //        .map(|x| self.compile_value_expr(x, false))
-            //        .collect::<Result<Vec<_>>>()?;
-            //    hir::Expr::cond_return(new_cond, new_fexpr_t, new_args_t, new_fexpr_f, new_args_f)
-            //}
-            //hir::Expr::Branch(fname, expr) => {
-            //    let if_result = self.compile_value_expr(*expr, false)?;
-            //    hir::Expr::branch(fname, if_result)
-            //}
-            hir::Expr::EnvRef(idx) => hir::Expr::fun_call(
-                func_ref_env_ref(),
-                vec![arg_ref_env(), hir::Expr::number(idx as i64)],
-            ),
             _ => panic!("[BUG] unexpected for async_splitter: {:?}", e.0),
         };
         Ok(Some(new_e))
@@ -521,16 +499,6 @@ fn async_fun_ty(orig_fun_ty: &hir::FunTy) -> hir::FunTy {
     }
 }
 
-//fn prepend_env_to_fn_ty(fun_ty: &hir::FunTy) -> hir::FunTy {
-//    let mut param_tys = fun_ty.param_tys.clone();
-//    param_tys.insert(0, hir::Ty::ChiikaEnv);
-//    hir::FunTy {
-//        asyncness: hir::Asyncness::Lowered,
-//        param_tys,
-//        ret_ty: Box::new(hir::Ty::RustFuture),
-//    }
-//}
-
 /// Append params for async (`$env` and `$cont`)
 fn append_async_params(
     params: &[hir::Param],
@@ -552,46 +520,6 @@ fn append_async_params(
 
     new_params
 }
-
-/// Prepend successive calls of `chiika_env_push` to `stmts`
-fn prepend_async_intro(
-    orig_func: &hir::Function,
-    mut stmts: Vec<hir::TypedExpr>,
-) -> Vec<hir::TypedExpr> {
-    let mut push_items = vec![arg_ref_cont(
-        orig_func.params.len(),
-        orig_func.ret_ty.clone(),
-    )];
-    for i in (0..orig_func.params.len()).rev() {
-        push_items.push(hir::Expr::arg_ref(i + 1, orig_func.params[i].ty.clone()));
-        // +1 for $env
-    }
-    let mut push_calls = push_items
-        .into_iter()
-        .map(|arg| call_chiika_env_push(arg))
-        .collect::<Vec<_>>();
-    push_calls.append(&mut stmts);
-    push_calls
-}
-
-//fn modify_cond_call(
-//    mut fexpr: hir::TypedExpr,
-//    mut args: Vec<hir::TypedExpr>,
-//    orig_func: &hir::Function,
-//) -> hir::TypedExpr {
-//    let get_env = arg_ref_env();
-//    if fexpr.1.is_async_fun() {
-//        fexpr.1 = prepend_env_to_fn_ty(&fexpr.1.into()).into();
-//        args.insert(0, get_env);
-//        hir::Expr::fun_call(fexpr, args)
-//    } else {
-//        let sync_call = hir::Expr::fun_call(fexpr, args);
-//        hir::Expr::fun_call(
-//            arg_ref_cont(orig_func.params.len(), orig_func.ret_ty.clone()),
-//            vec![get_env, sync_call],
-//        )
-//    }
-//}
 
 /// Create name of generated function like `foo_1`
 fn chapter_func_name(orig_name: &str, chapter_idx: usize) -> String {
