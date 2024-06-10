@@ -94,7 +94,7 @@ impl Compiler {
 impl HirRewriter for Compiler {
     fn rewrite_expr(&mut self, e: hir::TypedExpr) -> Result<hir::TypedExpr> {
         match e.0 {
-            hir::Expr::If(cond, mut then_exprs, mut else_exprs) => {
+            hir::Expr::If(cond, then_exprs, else_exprs) => {
                 let if_ty = e.1;
                 let id = self.blocks.len() - 1;
                 self.push(hir::Expr::cond_br(*cond, id + 1, id + 2));
