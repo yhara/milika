@@ -302,7 +302,7 @@ impl<'a> Compiler<'a> {
                 // No need to create a new chapter if on_return is true.
                 // In that case the args are modified later (see hir::Expr::Return)
                 if fun_ty.asyncness.is_async() && !on_return {
-                    self.compile_async_call(new_fexpr, new_args)?
+                    self.compile_async_call(new_fexpr, new_args, e.1)?
                 } else {
                     hir::Expr::fun_call(new_fexpr, new_args)
                 }
@@ -330,28 +330,13 @@ impl<'a> Compiler<'a> {
     fn compile_async_call(
         &mut self,
         fexpr: hir::TypedExpr,
-        mut new_args: Vec<hir::TypedExpr>,
+        args: Vec<hir::TypedExpr>,
+        async_result_ty: hir::Ty,
     ) -> Result<hir::TypedExpr> {
-        let hir::Ty::Fun(fun_ty) = &fexpr.1 else {
-            return Err(anyhow!("[BUG] not a function: {:?}", fexpr.0));
-        };
-        // Append `$env` and `$cont` (i.e. the next chapter)
-        new_args.insert(0, arg_ref_env());
-        let next_chapter = {
-            let next_chapter_name = chapter_func_name(&self.orig_func.name, self.chapters.len());
-            let next_chapter_ty = hir::FunTy {
-                asyncness: hir::Asyncness::Lowered,
-                param_tys: vec![hir::Ty::ChiikaEnv, *fun_ty.ret_ty.clone()],
-                ret_ty: Box::new(hir::Ty::RustFuture),
-            };
-            hir::Expr::func_ref(next_chapter_name, next_chapter_ty)
-        };
-        new_args.push(next_chapter);
-
         // Change chapter here
-        let async_result_ty = *fun_ty.ret_ty.clone();
+        let next_chapter_name = chapter_func_name(&self.orig_func.name, self.chapters.len());
         let last_chapter = self.chapters.last_mut();
-        let terminator = hir::Expr::return_(hir::Expr::fun_call(fexpr, new_args));
+        let terminator = hir::Expr::return_(modify_async_call(fexpr, args, next_chapter_name));
         last_chapter.stmts.push(terminator);
         last_chapter.async_result_ty = Some(async_result_ty.clone());
         self.chapters.add(Chapter::new_async_call_receiver(
@@ -380,8 +365,8 @@ impl<'a> Compiler<'a> {
         self.compile_if_clause(&mut then_chap, then_exprs, &endif_chap.name)?;
         self.compile_if_clause(&mut else_chap, else_exprs, &endif_chap.name)?;
 
-        let fcall_t = self.goto_call(&then_chap.name);
-        let fcall_f = self.goto_call(&else_chap.name);
+        let fcall_t = self.branch_call(&then_chap.name);
+        let fcall_f = self.branch_call(&else_chap.name);
         let terminator = hir::Expr::if_(
             new_cond_expr,
             vec![hir::Expr::return_(fcall_t)],
@@ -442,14 +427,14 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    /// Generate a call to the chapter function
-    fn goto_call(&self, chap_name: &str) -> hir::TypedExpr {
+    /// Generate a call to the if-branch function
+    fn branch_call(&self, chap_name: &str) -> hir::TypedExpr {
         // TODO: Support local variables
         let args = vec![arg_ref_env()];
         let chap_fun_ty = hir::FunTy {
             asyncness: self.orig_func.asyncness.clone(),
             param_tys: vec![hir::Ty::ChiikaEnv],
-            ret_ty: Box::new(self.orig_func.ret_ty.clone()),
+            ret_ty: Box::new(hir::Ty::RustFuture),
         };
         hir::Expr::fun_call(hir::Expr::func_ref(chap_name, chap_fun_ty), args)
     }
@@ -497,6 +482,29 @@ fn async_fun_ty(orig_fun_ty: &hir::FunTy) -> hir::FunTy {
         param_tys,
         ret_ty: Box::new(hir::Ty::RustFuture),
     }
+}
+
+fn modify_async_call(
+    fexpr: hir::TypedExpr,
+    mut args: Vec<hir::TypedExpr>,
+    next_chapter_name: String,
+) -> hir::TypedExpr {
+    let hir::Ty::Fun(fun_ty) = &fexpr.1 else {
+        panic!("[BUG] not a function: {:?}", fexpr.0);
+    };
+    // Append `$env` and `$cont` (i.e. the next chapter)
+    args.insert(0, arg_ref_env());
+    let next_chapter = {
+        let next_chapter_ty = hir::FunTy {
+            asyncness: hir::Asyncness::Lowered,
+            param_tys: vec![hir::Ty::ChiikaEnv, *fun_ty.ret_ty.clone()],
+            ret_ty: Box::new(hir::Ty::RustFuture),
+        };
+        hir::Expr::func_ref(next_chapter_name, next_chapter_ty)
+    };
+    args.push(next_chapter);
+    let new_fexpr = (fexpr.0, async_fun_ty(fexpr.1.as_fun_ty()).into());
+    hir::Expr::fun_call(new_fexpr, args)
 }
 
 /// Append params for async (`$env` and `$cont`)
