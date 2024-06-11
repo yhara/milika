@@ -351,7 +351,7 @@ impl<'a> Compiler<'a> {
         // Change chapter here
         let async_result_ty = *fun_ty.ret_ty.clone();
         let last_chapter = self.chapters.last_mut();
-        let terminator = hir::Expr::fun_call(fexpr, new_args);
+        let terminator = hir::Expr::return_(hir::Expr::fun_call(fexpr, new_args));
         last_chapter.stmts.push(terminator);
         last_chapter.async_result_ty = Some(async_result_ty.clone());
         self.chapters.add(Chapter::new_async_call_receiver(
@@ -437,7 +437,7 @@ impl<'a> Compiler<'a> {
                 ),
                 vec![arg_ref_env(), new_vexpr],
             );
-            clause_chap.add_stmt(goto_endif);
+            clause_chap.add_stmt(hir::Expr::return_(goto_endif));
         }
         Ok(())
     }
