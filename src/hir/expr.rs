@@ -99,7 +99,7 @@ impl std::fmt::Display for Expr {
                 write!(f, ")")
             }
             Expr::If(cond, then, else_) => {
-                write!(f, "if({}){{\n", cond.0)?;
+                write!(f, "if ({}) {{\n", cond.0)?;
                 for stmt in then {
                     write!(f, "    {}\n", stmt.0)?;
                 }
