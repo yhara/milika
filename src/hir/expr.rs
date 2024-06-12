@@ -21,26 +21,6 @@ pub enum Expr {
     Cast(CastType, Box<Typed<Expr>>),
 
     //
-    // Appears after `lower_async_if`
-    //
-    CondReturn(
-        Box<Typed<Expr>>,
-        Box<Typed<Expr>>,
-        Vec<Typed<Expr>>,
-        Box<Typed<Expr>>,
-        Vec<Typed<Expr>>,
-    ),
-    // Represents unconditional branch to endif-function
-    Branch(String, Box<Typed<Expr>>),
-    EnvRef(usize),
-
-    //
-    // Appears during async_splitter
-    //
-    // Terminates a function and converted to `Return` eventually
-    AsyncCall(Box<Typed<Expr>>, Vec<Typed<Expr>>),
-
-    //
     // Appears after `lower_if`
     //
     Br(Box<Typed<Expr>>, usize),
@@ -126,28 +106,13 @@ impl std::fmt::Display for Expr {
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}  # {}", e.0, e.1),
             Expr::Cast(cast_type, e) => write!(f, "({} as {})", e.0, cast_type.result_ty()),
-            Expr::CondReturn(cond, fexpr_t, _args_t, fexpr_f, _args_f) => {
-                let Ty::Fun(fun_ty_t) = &fexpr_t.1 else {
-                    panic!("[BUG] not a function: {:?}", fexpr_t);
-                };
-                let Ty::Fun(fun_ty_f) = &fexpr_f.1 else {
-                    panic!("[BUG] not a function: {:?}", fexpr_f);
-                };
-                write!(
-                    f,
-                    "cond_return {}, {}{}(...), {}{}(...)",
-                    cond.0, fexpr_t.0, fun_ty_t.asyncness, fexpr_f.0, fun_ty_f.asyncness
-                )
-            }
-            Expr::Branch(name, e) => write!(f, "branch {}({})", name, e.0),
-            Expr::EnvRef(idx) => write!(f, "%env[{}]", idx),
             Expr::Br(e, target) => write!(f, "%br ^bb{}({})  # {}", target, e.0, e.1),
             Expr::CondBr(cond, target_t, target_f) => {
                 write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
             }
             Expr::BlockArgRef => write!(f, "%block_arg"),
             Expr::Nop => write!(f, "%nop"),
-            _ => todo!("{:?}", self),
+            //_ => todo!("{:?}", self),
         }
     }
 }
@@ -165,9 +130,9 @@ impl Expr {
     //    (Expr::PseudoVar(pv), t)
     //}
 
-    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
-        (Expr::LVarRef(name.into()), ty)
-    }
+    //pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+    //    (Expr::LVarRef(name.into()), ty)
+    //}
 
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
         (Expr::ArgRef(idx), ty)
@@ -242,37 +207,6 @@ impl Expr {
             CastType::FunToAny => Ty::Any,
         };
         (Expr::Cast(cast_type, Box::new(e)), ty)
-    }
-
-    pub fn cond_return(
-        cond: TypedExpr,
-        fexpr_t: TypedExpr,
-        args_t: Vec<TypedExpr>,
-        fexpr_f: TypedExpr,
-        args_f: Vec<TypedExpr>,
-    ) -> TypedExpr {
-        (
-            Expr::CondReturn(
-                Box::new(cond),
-                Box::new(fexpr_t),
-                args_t,
-                Box::new(fexpr_f),
-                args_f,
-            ),
-            Ty::Void,
-        )
-    }
-
-    pub fn branch(name: impl Into<String>, e: TypedExpr) -> TypedExpr {
-        (Expr::Branch(name.into(), Box::new(e)), Ty::Void)
-    }
-
-    pub fn env_ref(idx: usize, ty: Ty) -> TypedExpr {
-        (Expr::EnvRef(idx), ty)
-    }
-
-    pub fn async_call(func: TypedExpr, args: Vec<TypedExpr>) -> TypedExpr {
-        (Expr::AsyncCall(Box::new(func), args), Ty::RustFuture)
     }
 
     pub fn br(value: TypedExpr, target: usize) -> TypedExpr {

@@ -171,10 +171,6 @@ impl<'a> HirVisitor for Check<'a> {
             (hir::Expr::FunCall(fexpr, _), _) => {
                 self.visit_fexpr(fexpr);
             }
-            (hir::Expr::CondReturn(_, fexpr_t, _, fexpr_f, _), _) => {
-                self.visit_fexpr(fexpr_t);
-                self.visit_fexpr(fexpr_f);
-            }
             _ => {}
         }
         Ok(())
@@ -253,10 +249,6 @@ impl HirVisitor for Assert {
         match texpr {
             (hir::Expr::FunCall(fexpr, _), _) => {
                 self.check_funcall(fexpr);
-            }
-            (hir::Expr::CondReturn(_, fexpr_t, _, fexpr_f, _), _) => {
-                self.check_funcall(fexpr_t);
-                self.check_funcall(fexpr_f);
             }
             _ => {}
         }
