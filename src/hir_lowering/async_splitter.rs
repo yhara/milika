@@ -357,8 +357,8 @@ impl<'a> Compiler<'a> {
         let func_name = self.chapters.current_name().to_string();
 
         let new_cond_expr = self.compile_value_expr(cond_expr, false)?;
-        let mut then_chap = Chapter::new_async_if_clause(func_name.clone(), "t");
-        let mut else_chap = Chapter::new_async_if_clause(func_name.clone(), "f");
+        let then_chap = Chapter::new_async_if_clause(func_name.clone(), "t");
+        let else_chap = Chapter::new_async_if_clause(func_name.clone(), "f");
         // Statements after `if` goes to an "endif" chapter
         let endif_chap = Chapter::new_async_end_if(func_name.clone(), "e", if_ty.clone()); // e for endif
 
