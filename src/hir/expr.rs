@@ -46,6 +46,7 @@ pub enum Expr {
     Br(Box<Typed<Expr>>, usize),
     CondBr(Box<Typed<Expr>>, usize, usize),
     BlockArgRef,
+    Nop,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,6 +146,7 @@ impl std::fmt::Display for Expr {
                 write!(f, "%cond_br {} ^bb{} ^bb{}", cond.0, target_t, target_f)
             }
             Expr::BlockArgRef => write!(f, "%block_arg"),
+            Expr::Nop => write!(f, "%nop"),
             _ => todo!("{:?}", self),
         }
     }
@@ -283,6 +285,10 @@ impl Expr {
 
     pub fn block_arg_ref(ty: Ty) -> TypedExpr {
         (Expr::BlockArgRef, ty)
+    }
+
+    pub fn nop() -> TypedExpr {
+        (Expr::Nop, Ty::Void)
     }
 
     pub fn is_async_fun_call(&self) -> bool {

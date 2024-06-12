@@ -105,7 +105,7 @@ impl HirRewriter for Compiler {
                 self.blocks.push(else_block);
 
                 if if_ty == hir::Ty::Void {
-                    Ok(hir::Expr::number(0)) // Nop
+                    Ok(hir::Expr::nop())
                 } else {
                     let endif_block = blocked::Block::new_empty(vec![if_ty.clone()]);
                     self.blocks.push(endif_block);
