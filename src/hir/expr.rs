@@ -166,11 +166,17 @@ impl Expr {
         }
         let t1 = yielded_ty(&then);
         let t2 = yielded_ty(&else_);
-        if t1 != t2 {
+        let if_ty = if t1 == Ty::Void {
+            t2
+        } else if t2 == Ty::Void {
+            t1
+        } else if t1 == t2 {
+            t1
+        } else {
             panic!("[BUG] if types mismatch (t1: {:?}, t2: {:?})", t1, t2);
-        }
+        };
 
-        (Expr::If(Box::new(cond), then, else_), t1)
+        (Expr::If(Box::new(cond), then, else_), if_ty)
     }
 
     pub fn yield_(expr: TypedExpr) -> TypedExpr {
