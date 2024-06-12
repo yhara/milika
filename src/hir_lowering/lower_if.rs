@@ -104,8 +104,10 @@ impl HirRewriter for Compiler {
                 let else_block = blocked::Block::new(vec![], modify_branch(else_exprs, id + 3));
                 self.blocks.push(else_block);
 
-                let endif_block = blocked::Block::new_empty(vec![if_ty.clone()]);
-                self.blocks.push(endif_block);
+                if if_ty != hir::Ty::Void {
+                    let endif_block = blocked::Block::new_empty(vec![if_ty.clone()]);
+                    self.blocks.push(endif_block);
+                }
                 Ok(hir::Expr::block_arg_ref(if_ty))
             }
             _ => Ok(e),
