@@ -362,9 +362,6 @@ impl<'a> Compiler<'a> {
         // Statements after `if` goes to an "endif" chapter
         let endif_chap = Chapter::new_async_end_if(func_name.clone(), "e", if_ty.clone()); // e for endif
 
-        self.compile_if_clause(&mut then_chap, then_exprs, &endif_chap.name)?;
-        self.compile_if_clause(&mut else_chap, else_exprs, &endif_chap.name)?;
-
         let fcall_t = self.branch_call(&then_chap.name);
         let fcall_f = self.branch_call(&else_chap.name);
         let terminator = hir::Expr::if_(
@@ -373,8 +370,12 @@ impl<'a> Compiler<'a> {
             vec![hir::Expr::return_(fcall_f)],
         );
         self.chapters.add_stmt(terminator);
+
         self.chapters.add(then_chap);
+        self.compile_if_clause(then_exprs, &endif_chap.name)?;
         self.chapters.add(else_chap);
+        self.compile_if_clause(else_exprs, &endif_chap.name)?;
+
         if *if_ty == hir::Ty::Void {
             // Both branches end with return
             Ok(None)
@@ -387,7 +388,6 @@ impl<'a> Compiler<'a> {
 
     fn compile_if_clause(
         &mut self,
-        clause_chap: &mut Chapter,
         mut exprs: Vec<hir::TypedExpr>,
         endif_chap_name: &str,
     ) -> Result<()> {
@@ -406,7 +406,7 @@ impl<'a> Compiler<'a> {
         };
         for expr in exprs {
             if let Some(new_expr) = self.compile_expr(expr, false)? {
-                clause_chap.add_stmt(new_expr);
+                self.chapters.add_stmt(new_expr);
             }
         }
         if let Some(vexpr) = opt_vexpr {
@@ -422,7 +422,7 @@ impl<'a> Compiler<'a> {
                 ),
                 vec![arg_ref_env(), new_vexpr],
             );
-            clause_chap.add_stmt(hir::Expr::return_(goto_endif));
+            self.chapters.add_stmt(hir::Expr::return_(goto_endif));
         }
         Ok(())
     }
