@@ -21,8 +21,8 @@ use std::collections::VecDeque;
 
 /// Splits asynchronous Milika func into multiple funcs.
 /// Also, signatures of async externs are modified to take `$env` and `$cont` as the first two params.
-pub fn run(shir: hir::split::Program) -> Result<hir::split::Program> {
-    let externs = shir
+pub fn run(hir: hir::Program) -> Result<hir::Program> {
+    let externs = hir
         .externs
         .into_iter()
         .map(|e| {
@@ -39,17 +39,15 @@ pub fn run(shir: hir::split::Program) -> Result<hir::split::Program> {
         .collect();
 
     let mut funcs = vec![];
-    for group in shir.funcs {
-        for mut f in group {
-            let mut c = Compiler {
-                orig_func: &mut f,
-                chapters: Chapters::new(),
-            };
-            let split_funcs = c.compile_func()?;
-            funcs.push(split_funcs);
-        }
+    for mut f in hir.funcs {
+        let mut c = Compiler {
+            orig_func: &mut f,
+            chapters: Chapters::new(),
+        };
+        let mut split_funcs = c.compile_func()?;
+        funcs.append(&mut split_funcs);
     }
-    Ok(hir::split::Program::new(externs, funcs))
+    Ok(hir::Program::new(externs, funcs))
 }
 
 #[derive(Debug)]

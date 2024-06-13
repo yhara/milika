@@ -17,19 +17,6 @@ pub trait HirRewriter {
         Ok(hir::Program { funcs, ..hir })
     }
 
-    fn walk_shir(&mut self, shir: hir::split::Program) -> Result<hir::split::Program> {
-        let mut funcs = vec![];
-        for group in shir.funcs {
-            let mut new_group = vec![];
-            for f in group {
-                let body_stmts = self.walk_exprs(f.body_stmts)?;
-                new_group.push(hir::Function { body_stmts, ..f });
-            }
-            funcs.push(new_group);
-        }
-        Ok(hir::split::Program::new(shir.externs, funcs))
-    }
-
     fn walk_exprs(&mut self, exprs: Vec<hir::TypedExpr>) -> Result<Vec<hir::TypedExpr>> {
         exprs.into_iter().map(|expr| self.walk_expr(expr)).collect()
     }

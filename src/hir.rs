@@ -2,7 +2,6 @@ pub mod asyncness_check;
 pub mod blocked;
 mod expr;
 pub mod rewriter;
-pub mod split;
 mod ty;
 pub mod typing;
 pub mod untyped;
@@ -28,6 +27,12 @@ impl fmt::Display for Program {
             write!(f, "{}", func)?;
         }
         write!(f, "")
+    }
+}
+
+impl Program {
+    pub fn new(externs: Vec<Extern>, funcs: Vec<Function>) -> Self {
+        Self { externs, funcs }
     }
 }
 
