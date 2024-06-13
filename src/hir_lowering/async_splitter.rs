@@ -137,7 +137,12 @@ impl<'a> Compiler<'a> {
             }
             hir::Expr::ArgRef(idx) => {
                 if self.chapters.len() == 1 {
-                    hir::Expr::arg_ref(idx, e.1)
+                    let i = if self.orig_func.asyncness.is_async() {
+                        idx + 1
+                    } else {
+                        idx
+                    };
+                    hir::Expr::arg_ref(i, e.1)
                 } else {
                     hir::Expr::fun_call(
                         func_ref_env_ref(),
