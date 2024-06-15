@@ -131,16 +131,6 @@ impl Verifier {
                     }
                 }
             }
-            hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
-                self.verify_expr(f, cond)?;
-                self.verify_expr(f, fexpr_t)?;
-                self.verify_exprs(f, args_t)?;
-                self.verify_expr(f, fexpr_f)?;
-                self.verify_exprs(f, args_f)?;
-            }
-            hir::Expr::Branch(_, expr) => {
-                self.verify_expr(f, expr)?;
-            }
             hir::Expr::Br(e, n) => {
                 if *n >= f.body_blocks.len() {
                     bail!("block index out of range: {}", n);
@@ -157,7 +147,8 @@ impl Verifier {
                 }
             }
             hir::Expr::BlockArgRef => (),
-            _ => panic!("not supported by verifier: {:?}", e.0),
+            hir::Expr::Nop => (),
+            //_ => panic!("not supported by verifier: {:?}", e.0),
         }
         Ok(())
     }

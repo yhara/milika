@@ -2,7 +2,6 @@ pub mod asyncness_check;
 pub mod blocked;
 mod expr;
 pub mod rewriter;
-pub mod split;
 mod ty;
 pub mod typing;
 pub mod untyped;
@@ -28,6 +27,12 @@ impl fmt::Display for Program {
             write!(f, "{}", func)?;
         }
         write!(f, "")
+    }
+}
+
+impl Program {
+    pub fn new(externs: Vec<Extern>, funcs: Vec<Function>) -> Self {
+        Self { externs, funcs }
     }
 }
 
@@ -192,6 +197,7 @@ impl From<bool> for Asyncness {
 }
 
 impl Asyncness {
+    /// Returns true for Asyncness::Async. Panics if not applicable
     pub fn is_async(&self) -> bool {
         match self {
             Asyncness::Unknown => panic!("[BUG] asyncness is unknown"),
@@ -199,5 +205,9 @@ impl Asyncness {
             Asyncness::Sync => false,
             Asyncness::Lowered => panic!("[BUG] asyncness is lost"),
         }
+    }
+
+    pub fn is_sync(&self) -> bool {
+        !self.is_async()
     }
 }

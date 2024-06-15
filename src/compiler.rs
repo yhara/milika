@@ -201,7 +201,8 @@ impl<'c> Compiler<'c> {
                 self.compile_cond_br(blocks, block, lvars, cond, true_block_id, false_block_id)
             }
             hir::Expr::BlockArgRef => self.compile_block_arg_ref(block),
-            _ => panic!("should be lowered before compiler.rs: {:?}", texpr.0),
+            hir::Expr::Nop => Ok(None),
+            //_ => panic!("should be lowered before compiler.rs: {:?}", texpr.0),
         }
     }
 

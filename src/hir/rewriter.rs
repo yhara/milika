@@ -17,19 +17,6 @@ pub trait HirRewriter {
         Ok(hir::Program { funcs, ..hir })
     }
 
-    fn walk_shir(&mut self, shir: hir::split::Program) -> Result<hir::split::Program> {
-        let mut funcs = vec![];
-        for group in shir.funcs {
-            let mut new_group = vec![];
-            for f in group {
-                let body_stmts = self.walk_exprs(f.body_stmts)?;
-                new_group.push(hir::Function { body_stmts, ..f });
-            }
-            funcs.push(new_group);
-        }
-        Ok(hir::split::Program::new(shir.externs, funcs))
-    }
-
     fn walk_exprs(&mut self, exprs: Vec<hir::TypedExpr>) -> Result<Vec<hir::TypedExpr>> {
         exprs.into_iter().map(|expr| self.walk_expr(expr)).collect()
     }
@@ -60,17 +47,6 @@ pub trait HirRewriter {
             hir::Expr::Assign(name, rhs) => hir::Expr::assign(name, self.walk_expr(*rhs)?),
             hir::Expr::Return(expr) => hir::Expr::return_(self.walk_expr(*expr)?),
             hir::Expr::Cast(cast_type, expr) => hir::Expr::cast(cast_type, self.walk_expr(*expr)?),
-            hir::Expr::CondReturn(cond, fexpr_t, args_t, fexpr_f, args_f) => {
-                hir::Expr::cond_return(
-                    self.walk_expr(*cond)?,
-                    self.walk_expr(*fexpr_t)?,
-                    self.walk_exprs(args_t)?,
-                    self.walk_expr(*fexpr_f)?,
-                    self.walk_exprs(args_f)?,
-                )
-            }
-            hir::Expr::Branch(name, expr) => hir::Expr::branch(name, self.walk_expr(*expr)?),
-            hir::Expr::EnvRef(_) => expr,
             _ => panic!("not supported by hir::rewriter: {:?}", expr),
         };
         self.rewrite_expr(new_expr)
