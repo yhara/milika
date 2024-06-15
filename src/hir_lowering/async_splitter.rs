@@ -218,9 +218,15 @@ impl<'a> Compiler<'a> {
         then_exprs: Vec<hir::TypedExpr>,
         else_exprs: Vec<hir::TypedExpr>,
     ) -> Result<Option<hir::TypedExpr>> {
+        let new_cond_expr = self.compile_value_expr(cond_expr, false)?;
+        if self.orig_func.asyncness.is_sync() {
+            let then = self.compile_exprs(then_exprs)?;
+            let els = self.compile_exprs(else_exprs)?;
+            return Ok(Some(hir::Expr::if_(new_cond_expr, then, els)));
+        }
+
         let func_name = self.chapters.current_name().to_string();
 
-        let new_cond_expr = self.compile_value_expr(cond_expr, false)?;
         let then_chap = Chapter::new_async_if_clause(func_name.clone(), "t");
         let else_chap = Chapter::new_async_if_clause(func_name.clone(), "f");
         // Statements after `if` goes to an "endif" chapter
@@ -248,6 +254,17 @@ impl<'a> Compiler<'a> {
             // FIXME: This magic number is decided by async_splitter.rs
             Ok(Some(hir::Expr::arg_ref(1, if_ty.clone())))
         }
+    }
+
+    fn compile_exprs(&mut self, exprs: Vec<hir::TypedExpr>) -> Result<Vec<hir::TypedExpr>> {
+        debug_assert!(self.orig_func.asyncness.is_sync());
+        let mut new_exprs = vec![];
+        for expr in exprs {
+            if let Some(new_expr) = self.compile_expr(expr, false)? {
+                new_exprs.push(new_expr);
+            }
+        }
+        Ok(new_exprs)
     }
 
     fn compile_if_clause(
@@ -305,6 +322,9 @@ impl<'a> Compiler<'a> {
 
     fn compile_return(&mut self, expr: hir::TypedExpr) -> Result<hir::TypedExpr> {
         let new_expr = self.compile_value_expr(expr, true)?;
+        if self.orig_func.asyncness.is_sync() {
+            return Ok(hir::Expr::return_(new_expr));
+        }
         let env_pop = {
             let n_pop = self.orig_func.params.len() + 1; // +1 for $cont
             let cont_ty = hir::Ty::Fun(hir::FunTy {
