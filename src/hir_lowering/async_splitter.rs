@@ -43,6 +43,7 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
         let mut c = Compiler {
             orig_func: &mut f,
             chapters: Chapters::new(),
+            gensym_ct: 0,
         };
         let mut split_funcs = c.compile_func()?;
         funcs.append(&mut split_funcs);
@@ -54,6 +55,7 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
 struct Compiler<'a> {
     orig_func: &'a mut hir::Function,
     chapters: Chapters,
+    gensym_ct: usize,
 }
 
 impl<'a> Compiler<'a> {
@@ -345,10 +347,28 @@ impl<'a> Compiler<'a> {
             let new_fexpr = (fexpr.0, async_fun_ty(fexpr.1.as_fun_ty()).into());
             hir::Expr::fun_call(new_fexpr, args)
         } else {
-            // `(env_pop())(env, value)`
+            // alloc tmp;    // tmp is needed because
+            // tmp = value   // calculating value may call env_ref
+            // `(env_pop())(env, tmp)`
             hir::Expr::fun_call(env_pop, vec![arg_ref_env(), new_expr])
         };
         Ok(hir::Expr::return_(value_expr))
+    }
+
+    fn declare_tmpvar(
+        &mut self,
+        expr: hir::TypedExpr) -> hir::TypedExpr {
+        let varname = self.gensym();
+        vec![
+            hir::Expr::alloc(varname.clone()),
+            hir::Expr::assign(varname, expr),
+
+    }
+
+    fn gensym(&mut self) -> String {
+        let n = self.gensym_ct;
+        self.gensym_ct += 1;
+        format!("${n}")
     }
 }
 
