@@ -1,20 +1,11 @@
-extern print(Int n) -> Null
-extern(async) sleep_sec(Int n) -> Null
 
-fun foo(Int a, Int b) -> Int {
-  # if () {}
-  if (a < b) {
-    print(a + b)
-    sleep_sec(0)
-    return a + b
-  } else {
-    print(a + b)
-    sleep_sec(0)
-    return a + b
-  }
-}
+extern print(Int n) -> Null
 
 fun chiika_main() -> Int {
-  print(foo(1, 2))
+  if (true) {
+    print(456)
+  } else {
+    print(789)
+  }
   return 0
 }

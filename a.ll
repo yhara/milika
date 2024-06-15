@@ -7,8 +7,6 @@ declare void @free(ptr)
 
 declare i64 @print(i64)
 
-declare ptr @sleep_sec(ptr, i64, ptr)
-
 declare i64 @chiika_env_push(ptr, i64)
 
 declare i64 @chiika_env_pop(ptr, i64)
@@ -17,79 +15,26 @@ declare i64 @chiika_env_ref(ptr, i64)
 
 declare i64 @chiika_start_tokio(i64)
 
-define ptr @foo(ptr %0, i64 %1, i64 %2, ptr %3) {
-  %5 = ptrtoint ptr %3 to i64
-  %6 = call i64 @chiika_env_push(ptr %0, i64 %5)
-  %7 = call i64 @chiika_env_push(ptr %0, i64 %2)
-  %8 = call i64 @chiika_env_push(ptr %0, i64 %1)
-  %9 = icmp ult i64 %1, %2
-  br i1 %9, label %10, label %12
+define i64 @chiika_main() {
+  br i1 true, label %1, label %3
 
-10:                                               ; preds = %4
-  %11 = call ptr @"foo't"(ptr %0)
-  ret ptr %11
+1:                                                ; preds = %0
+  %2 = call i64 @print(i64 456)
+  br label %5
 
-12:                                               ; preds = %4
-  %13 = call ptr @"foo'f"(ptr %0)
-  ret ptr %13
-}
+3:                                                ; preds = %0
+  %4 = call i64 @print(i64 789)
+  br label %5
 
-define ptr @"foo't"(ptr %0) {
-  %2 = call i64 @chiika_env_ref(ptr %0, i64 0)
-  %3 = call i64 @chiika_env_ref(ptr %0, i64 1)
-  %4 = add i64 %2, %3
-  %5 = call i64 @print(i64 %4)
-  %6 = call ptr @sleep_sec(ptr %0, i64 0, ptr @foo_2)
-  ret ptr %6
-}
-
-define ptr @foo_2(ptr %0, i64 %1) {
-  %3 = call i64 @chiika_env_pop(ptr %0, i64 3)
-  %4 = inttoptr i64 %3 to ptr
-  %5 = call i64 @chiika_env_ref(ptr %0, i64 0)
-  %6 = call i64 @chiika_env_ref(ptr %0, i64 1)
-  %7 = add i64 %5, %6
-  %8 = call ptr %4(ptr %0, i64 %7)
-  ret ptr %8
-}
-
-define ptr @"foo'f"(ptr %0) {
-  %2 = call i64 @chiika_env_ref(ptr %0, i64 0)
-  %3 = call i64 @chiika_env_ref(ptr %0, i64 1)
-  %4 = add i64 %2, %3
-  %5 = call i64 @print(i64 %4)
-  %6 = call ptr @sleep_sec(ptr %0, i64 0, ptr @foo_4)
-  ret ptr %6
-}
-
-define ptr @foo_4(ptr %0, i64 %1) {
-  %3 = call i64 @chiika_env_pop(ptr %0, i64 3)
-  %4 = inttoptr i64 %3 to ptr
-  %5 = call i64 @chiika_env_ref(ptr %0, i64 0)
-  %6 = call i64 @chiika_env_ref(ptr %0, i64 1)
-  %7 = add i64 %5, %6
-  %8 = call ptr %4(ptr %0, i64 %7)
-  ret ptr %8
-}
-
-define ptr @chiika_main(ptr %0, ptr %1) {
-  %3 = ptrtoint ptr %1 to i64
-  %4 = call i64 @chiika_env_push(ptr %0, i64 %3)
-  %5 = call ptr @foo(ptr %0, i64 1, i64 2, ptr @chiika_main_1)
-  ret ptr %5
-}
-
-define ptr @chiika_main_1(ptr %0, i64 %1) {
-  %3 = call i64 @print(i64 %1)
-  %4 = call i64 @chiika_env_pop(ptr %0, i64 1)
-  %5 = inttoptr i64 %4 to ptr
-  %6 = call ptr %5(ptr %0, i64 0)
-  ret ptr %6
+5:                                                ; preds = %1, %3
+  %6 = phi i64 [ 0, %3 ], [ 0, %1 ]
+  ret i64 0
 }
 
 define ptr @chiika_start_user(ptr %0, ptr %1) {
-  %3 = call ptr @chiika_main(ptr %0, ptr %1)
-  ret ptr %3
+  %3 = call i64 @chiika_main()
+  %4 = call ptr %1(ptr %0, i64 %3)
+  ret ptr %4
 }
 
 define i64 @main() {

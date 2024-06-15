@@ -19,7 +19,6 @@ pub enum Expr {
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
     Cast(CastType, Box<Typed<Expr>>),
-    Stmts
 
     //
     // Appears after `lower_if`
