@@ -130,9 +130,9 @@ impl Expr {
     //    (Expr::PseudoVar(pv), t)
     //}
 
-    //pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
-    //    (Expr::LVarRef(name.into()), ty)
-    //}
+    pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
+        (Expr::LVarRef(name.into()), ty)
+    }
 
     pub fn arg_ref(idx: usize, ty: Ty) -> TypedExpr {
         (Expr::ArgRef(idx), ty)
@@ -194,6 +194,10 @@ impl Expr {
             panic!("[BUG] while cond not bool: {:?}", cond);
         }
         (Expr::While(Box::new(cond), body), Ty::Null)
+    }
+
+    pub fn alloc(name: impl Into<String>) -> TypedExpr {
+        (Expr::Alloc(name.into()), Ty::Null)
     }
 
     pub fn assign(name: impl Into<String>, e: TypedExpr) -> TypedExpr {

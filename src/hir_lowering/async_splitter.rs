@@ -43,6 +43,7 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
         let mut c = Compiler {
             orig_func: &mut f,
             chapters: Chapters::new(),
+            gensym_ct: 0,
         };
         let mut split_funcs = c.compile_func()?;
         funcs.append(&mut split_funcs);
@@ -54,6 +55,7 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
 struct Compiler<'a> {
     orig_func: &'a mut hir::Function,
     chapters: Chapters,
+    gensym_ct: usize,
 }
 
 impl<'a> Compiler<'a> {
@@ -345,10 +347,30 @@ impl<'a> Compiler<'a> {
             let new_fexpr = (fexpr.0, async_fun_ty(fexpr.1.as_fun_ty()).into());
             hir::Expr::fun_call(new_fexpr, args)
         } else {
-            // `(env_pop())(env, value)`
-            hir::Expr::fun_call(env_pop, vec![arg_ref_env(), new_expr])
+            // alloc tmp;    // tmp is needed because
+            // tmp = value   // calculating value may call env_ref
+            // `(env_pop())(env, tmp)`
+            let tmp = self.store_to_tmpvar(new_expr);
+            hir::Expr::fun_call(env_pop, vec![arg_ref_env(), tmp])
         };
         Ok(hir::Expr::return_(value_expr))
+    }
+
+    /// Store the value to a temporary variable and return the varref
+    fn store_to_tmpvar(&mut self, value: hir::TypedExpr) -> hir::TypedExpr {
+        let ty = value.1.clone();
+        let varname = self.gensym();
+        self.chapters.add_stmts(vec![
+            hir::Expr::alloc(varname.clone()),
+            hir::Expr::assign(varname.clone(), value),
+        ]);
+        hir::Expr::lvar_ref(varname, ty)
+    }
+
+    fn gensym(&mut self) -> String {
+        let n = self.gensym_ct;
+        self.gensym_ct += 1;
+        format!("${n}")
     }
 }
 
@@ -527,6 +549,10 @@ impl Chapters {
     fn add_stmt(&mut self, stmt: hir::TypedExpr) {
         self.chaps.last_mut().unwrap().add_stmt(stmt);
     }
+
+    fn add_stmts(&mut self, stmts: Vec<hir::TypedExpr>) {
+        self.chaps.last_mut().unwrap().add_stmts(stmts);
+    }
 }
 
 #[derive(Debug)]
@@ -624,6 +650,10 @@ impl Chapter {
 
     fn add_stmt(&mut self, stmt: hir::TypedExpr) {
         self.stmts.push(stmt);
+    }
+
+    fn add_stmts(&mut self, stmts: Vec<hir::TypedExpr>) {
+        self.stmts.extend(stmts);
     }
 }
 
