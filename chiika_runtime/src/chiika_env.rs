@@ -6,12 +6,21 @@ type EnvItem = (ChiikaValue, TypeId);
 #[derive(Debug)]
 pub struct ChiikaEnv {
     // Element is either 64-bit integer or 64-bit pointer.
-    stack: Vec<EnvItem>,
+    stack: Vec<Option<EnvItem>>,
 }
 
 impl ChiikaEnv {
     pub fn new() -> ChiikaEnv {
-        ChiikaEnv { stack: vec![] }
+        ChiikaEnv { stack: vec![vec![]] }
+    }
+}
+
+/// Push a frame to the stack.
+#[no_mangle]
+pub extern "C" fn chiika_env_push_frame(env: *mut ChiikaEnv, size: i64) {
+    unsafe {
+        let v = std::iter::repeat(None).take(size).collect();
+        (*env).stack.push(v);
     }
 }
 
