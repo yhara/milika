@@ -146,10 +146,7 @@ impl<'a> Compiler<'a> {
                     };
                     hir::Expr::arg_ref(i, e.1)
                 } else {
-                    hir::Expr::fun_call(
-                        func_ref_env_ref(),
-                        vec![arg_ref_env(), hir::Expr::number(idx as i64)],
-                    )
+                    call_chiika_env_ref(hir::Expr::number(idx as i64))
                 }
             }
             hir::Expr::FuncRef(_) => e,
@@ -485,6 +482,7 @@ fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr
 }
 
 fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
+    let type_id = hir::Expr::number(val.1.type_id());
     let cast_val = {
         let cast_type = match val.1 {
             hir::Ty::Null => hir::CastType::NullToAny,
@@ -496,23 +494,27 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
     };
     let fun_ty = hir::FunTy {
         asyncness: hir::Asyncness::Lowered,
-        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any],
+        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any, hir::Ty::Int],
         ret_ty: Box::new(hir::Ty::Null),
     };
     hir::Expr::fun_call(
         hir::Expr::func_ref("chiika_env_push", fun_ty),
-        vec![arg_ref_env(), cast_val],
+        vec![arg_ref_env(), cast_val, type_id],
     )
 }
 
-fn func_ref_env_ref() -> hir::TypedExpr {
+fn call_chiika_env_ref(n: hir::TypedExpr) -> hir::TypedExpr {
+    let type_id = hir::Expr::number(hir::Ty::Int.type_id());
     let fun_ty = hir::FunTy {
         asyncness: hir::Asyncness::Lowered,
-        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
+        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int, hir::Ty::Int],
         // Milika lvars are all int
         ret_ty: Box::new(hir::Ty::Int),
     };
-    hir::Expr::func_ref("chiika_env_ref", fun_ty)
+    hir::Expr::fun_call(
+        hir::Expr::func_ref("chiika_env_ref", fun_ty),
+        vec![arg_ref_env(), n, type_id],
+    )
 }
 
 #[derive(Debug)]
