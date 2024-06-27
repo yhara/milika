@@ -12,7 +12,7 @@
 //! }
 //! fun foo_1($env, $async_result) -> RustFuture {
 //!   print($async_result);
-//!   return chiika_env_pop($env)(42); // Call the original $cont
+//!   return chiika_env_pop_frame($env)(42); // Call the original $cont
 //! }
 //! ```
 use crate::hir;
@@ -79,6 +79,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn _compile_async_intro(&mut self) {
+        self.chapters.add_stmt(call_chiika_env_push_frame());
         let arity = self.orig_func.params.len();
         let mut push_items = vec![arg_ref_cont(arity, self.orig_func.ret_ty.clone())];
         for i in (0..arity).rev() {
@@ -331,7 +332,7 @@ impl<'a> Compiler<'a> {
                 param_tys: vec![hir::Ty::ChiikaEnv, self.orig_func.ret_ty.clone()],
                 ret_ty: Box::new(hir::Ty::RustFuture),
             });
-            call_chiika_env_pop(n_pop, cont_ty)
+            call_chiika_env_pop_frame(n_pop, cont_ty)
         };
         let value_expr = if new_expr.0.is_async_fun_call() {
             // Convert `callee(args...)`
@@ -458,14 +459,28 @@ fn arg_ref_async_result(ty: hir::Ty) -> hir::TypedExpr {
     hir::Expr::arg_ref(1, ty)
 }
 
-fn call_chiika_env_pop(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr {
+fn call_chiika_env_push_frame() -> hir::TypedExpr {
+    hir::Expr::fun_call(
+        hir::Expr::func_ref(
+            "chiika_env_push_frame",
+            hir::FunTy {
+                asyncness: hir::Asyncness::Lowered,
+                param_tys: vec![hir::Ty::ChiikaEnv],
+                ret_ty: Box::new(hir::Ty::Null),
+            },
+        ),
+        vec![arg_ref_env()],
+    )
+}
+
+fn call_chiika_env_pop_frame(n_pop: usize, popped_value_ty: hir::Ty) -> hir::TypedExpr {
     let env_pop = {
         let fun_ty = hir::FunTy {
             asyncness: hir::Asyncness::Lowered,
             param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
             ret_ty: Box::new(hir::Ty::Any),
         };
-        hir::Expr::func_ref("chiika_env_pop", fun_ty)
+        hir::Expr::func_ref("chiika_env_pop_frame", fun_ty)
     };
     let cast_type = match &popped_value_ty {
         hir::Ty::Int => hir::CastType::AnyToInt,
