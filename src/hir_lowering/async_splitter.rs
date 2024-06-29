@@ -7,7 +7,8 @@
 //! }
 //! // After
 //! fun foo($env, $cont) -> RustFuture {
-//!   chiika_env_push($env, $cont);
+//!   chiika_env_push_frame($env, 1);
+//!   chiika_env_set($env, 0, $cont);
 //!   return sleep_sec(foo_1, 1);
 //! }
 //! fun foo_1($env, $async_result) -> RustFuture {
@@ -79,18 +80,18 @@ impl<'a> Compiler<'a> {
     }
 
     fn _compile_async_intro(&mut self) {
-        self.chapters.add_stmt(call_chiika_env_push_frame());
         let arity = self.orig_func.params.len();
+        self.chapters
+            .add_stmt(call_chiika_env_push_frame(arity + 1));
         let mut push_items = vec![arg_ref_cont(arity, self.orig_func.ret_ty.clone())];
-        for i in (0..arity).rev() {
+        for i in 0..arity {
             push_items.push(hir::Expr::arg_ref(
-                i + 1,
+                i + 1, // +1 for $env
                 self.orig_func.params[i].ty.clone(),
             ));
-            // +1 for $env
         }
-        for arg in push_items {
-            self.chapters.add_stmt(call_chiika_env_push(arg));
+        for (i, arg) in push_items.into_iter().enumerate() {
+            self.chapters.add_stmt(call_chiika_env_set(i, arg));
         }
     }
 
@@ -147,7 +148,8 @@ impl<'a> Compiler<'a> {
                     };
                     hir::Expr::arg_ref(i, e.1)
                 } else {
-                    call_chiika_env_ref(hir::Expr::number(idx as i64))
+                    let i = idx + 1; // +1 for $cont
+                    call_chiika_env_ref(hir::Expr::number(i as i64))
                 }
             }
             hir::Expr::FuncRef(_) => e,
@@ -459,17 +461,17 @@ fn arg_ref_async_result(ty: hir::Ty) -> hir::TypedExpr {
     hir::Expr::arg_ref(1, ty)
 }
 
-fn call_chiika_env_push_frame() -> hir::TypedExpr {
+fn call_chiika_env_push_frame(size: usize) -> hir::TypedExpr {
     hir::Expr::fun_call(
         hir::Expr::func_ref(
             "chiika_env_push_frame",
             hir::FunTy {
                 asyncness: hir::Asyncness::Lowered,
-                param_tys: vec![hir::Ty::ChiikaEnv],
+                param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int],
                 ret_ty: Box::new(hir::Ty::Null),
             },
         ),
-        vec![arg_ref_env()],
+        vec![arg_ref_env(), hir::Expr::number(size as i64)],
     )
 }
 
@@ -496,7 +498,8 @@ fn call_chiika_env_pop_frame(n_pop: usize, popped_value_ty: hir::Ty) -> hir::Typ
     )
 }
 
-fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
+fn call_chiika_env_set(i: usize, val: hir::TypedExpr) -> hir::TypedExpr {
+    let idx = hir::Expr::number(i as i64);
     let type_id = hir::Expr::number(val.1.type_id());
     let cast_val = {
         let cast_type = match val.1 {
@@ -509,12 +512,12 @@ fn call_chiika_env_push(val: hir::TypedExpr) -> hir::TypedExpr {
     };
     let fun_ty = hir::FunTy {
         asyncness: hir::Asyncness::Lowered,
-        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Any, hir::Ty::Int],
+        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Int, hir::Ty::Any, hir::Ty::Int],
         ret_ty: Box::new(hir::Ty::Null),
     };
     hir::Expr::fun_call(
-        hir::Expr::func_ref("chiika_env_push", fun_ty),
-        vec![arg_ref_env(), cast_val, type_id],
+        hir::Expr::func_ref("chiika_env_set", fun_ty),
+        vec![arg_ref_env(), idx, cast_val, type_id],
     )
 }
 
