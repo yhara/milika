@@ -91,7 +91,7 @@ pub extern "C" fn chiika_env_ref(env: *mut ChiikaEnv, n: i64, expected_type_id: 
     };
     if type_id != expected_type_id {
         panic!(
-            "[BUG;chiika_env_ref] Type mismatch: expected type_id={}, but got type_id={}",
+            "[BUG;chiika_env_ref] Type mismatch: expected type_id={} for index {n} but got type_id={}",
             expected_type_id, type_id
         );
     }
