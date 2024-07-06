@@ -7,34 +7,47 @@ declare void @free(ptr)
 
 declare i64 @print(i64)
 
-declare i64 @chiika_env_push(ptr, i64)
+declare ptr @sleep_sec(ptr, i64, ptr)
 
-declare i64 @chiika_env_pop(ptr, i64)
+declare i64 @chiika_env_push_frame(ptr, i64)
 
-declare i64 @chiika_env_ref(ptr, i64)
+declare i64 @chiika_env_set(ptr, i64, i64, i64)
+
+declare i64 @chiika_env_pop_frame(ptr, i64)
+
+declare i64 @chiika_env_ref(ptr, i64, i64)
 
 declare i64 @chiika_start_tokio(i64)
 
-define i64 @chiika_main() {
-  br i1 true, label %1, label %3
+define ptr @chiika_main(ptr %0, ptr %1) {
+  %3 = call i64 @chiika_env_push_frame(ptr %0, i64 2)
+  %4 = ptrtoint ptr %1 to i64
+  %5 = call i64 @chiika_env_set(ptr %0, i64 0, i64 %4, i64 6)
+  %6 = call i64 @chiika_env_set(ptr %0, i64 1, i64 3, i64 1)
+  %7 = call i64 @chiika_env_ref(ptr %0, i64 1, i64 1)
+  %8 = call i64 @print(i64 %7)
+  %9 = call ptr @sleep_sec(ptr %0, i64 1, ptr @chiika_main_1)
+  ret ptr %9
+}
 
-1:                                                ; preds = %0
-  %2 = call i64 @print(i64 456)
-  br label %5
-
-3:                                                ; preds = %0
-  %4 = call i64 @print(i64 789)
-  br label %5
-
-5:                                                ; preds = %1, %3
-  %6 = phi i64 [ 0, %3 ], [ 0, %1 ]
-  ret i64 0
+define ptr @chiika_main_1(ptr %0, i64 %1) {
+  %3 = call i64 @chiika_env_ref(ptr %0, i64 1, i64 1)
+  %4 = call i64 @print(i64 %3)
+  %5 = alloca i64, i64 1, align 8
+  %6 = insertvalue { ptr, ptr, i64 } undef, ptr %5, 0
+  %7 = insertvalue { ptr, ptr, i64 } %6, ptr %5, 1
+  %8 = insertvalue { ptr, ptr, i64 } %7, i64 0, 2
+  store i64 0, ptr %5, align 4
+  %9 = call i64 @chiika_env_pop_frame(ptr %0, i64 2)
+  %10 = inttoptr i64 %9 to ptr
+  %11 = load i64, ptr %5, align 4
+  %12 = call ptr %10(ptr %0, i64 %11)
+  ret ptr %12
 }
 
 define ptr @chiika_start_user(ptr %0, ptr %1) {
-  %3 = call i64 @chiika_main()
-  %4 = call ptr %1(ptr %0, i64 %3)
-  ret ptr %4
+  %3 = call ptr @chiika_main(ptr %0, ptr %1)
+  ret ptr %3
 }
 
 define i64 @main() {
