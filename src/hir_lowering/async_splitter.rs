@@ -41,8 +41,10 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
 
     let mut funcs = vec![];
     for mut f in hir.funcs {
+        let allocs = hir::visitor::Allocs::collect(&f.body_stmts)?;
         let mut c = Compiler {
             orig_func: &mut f,
+            allocs,
             chapters: Chapters::new(),
             gensym_ct: 0,
         };
@@ -55,6 +57,7 @@ pub fn run(hir: hir::Program) -> Result<hir::Program> {
 #[derive(Debug)]
 struct Compiler<'a> {
     orig_func: &'a mut hir::Function,
+    allocs: Vec<(String, hir::Ty)>,
     chapters: Chapters,
     gensym_ct: usize,
 }
@@ -82,7 +85,7 @@ impl<'a> Compiler<'a> {
     fn _compile_async_intro(&mut self) {
         let arity = self.orig_func.params.len();
         self.chapters
-            .add_stmt(call_chiika_env_push_frame(arity + 1));
+            .add_stmt(call_chiika_env_push_frame(self.frame_size()));
         let mut push_items = vec![arg_ref_cont(arity, self.orig_func.ret_ty.clone())];
         for i in 0..arity {
             push_items.push(hir::Expr::arg_ref(
@@ -130,14 +133,9 @@ impl<'a> Compiler<'a> {
         let new_e = match e.0 {
             hir::Expr::Number(_) => e,
             hir::Expr::PseudoVar(_) => e,
-            hir::Expr::LVarRef(_) => {
-                if self.chapters.len() == 1 {
-                    // The variable is just there in the first chapter
-                    e
-                } else {
-                    // We need to carry the variable via env
-                    todo!()
-                }
+            hir::Expr::LVarRef(ref varname) => {
+                let i = self.lvar_idx(varname);
+                call_chiika_env_ref(hir::Expr::number(i as i64))
             }
             hir::Expr::ArgRef(idx) => {
                 if self.chapters.len() == 1 {
@@ -173,8 +171,10 @@ impl<'a> Compiler<'a> {
                     hir::Expr::fun_call(new_fexpr, new_args)
                 }
             }
-            hir::Expr::Assign(name, rhs) => {
-                hir::Expr::assign(name, self.compile_value_expr(*rhs, false)?)
+            hir::Expr::Assign(varname, rhs) => {
+                let i = self.lvar_idx(&varname);
+                let v = self.compile_value_expr(*rhs, false)?;
+                call_chiika_env_set(i, v)
             }
             hir::Expr::If(cond_expr, then_exprs, else_exprs) => {
                 return self.compile_if(&e.1, *cond_expr, then_exprs, else_exprs);
@@ -184,7 +184,7 @@ impl<'a> Compiler<'a> {
                 hir::Expr::yield_(new_expr)
             }
             hir::Expr::While(_cond_expr, _body_exprs) => todo!(),
-            hir::Expr::Alloc(_) => e,
+            hir::Expr::Alloc(_) => hir::Expr::nop(),
             hir::Expr::Return(expr) => self.compile_return(*expr)?,
             _ => panic!("[BUG] unexpected for async_splitter: {:?}", e.0),
         };
@@ -328,13 +328,12 @@ impl<'a> Compiler<'a> {
             return Ok(hir::Expr::return_(new_expr));
         }
         let env_pop = {
-            let n_pop = self.orig_func.params.len() + 1; // +1 for $cont
             let cont_ty = hir::Ty::Fun(hir::FunTy {
                 asyncness: hir::Asyncness::Lowered,
                 param_tys: vec![hir::Ty::ChiikaEnv, self.orig_func.ret_ty.clone()],
                 ret_ty: Box::new(hir::Ty::RustFuture),
             });
-            call_chiika_env_pop_frame(n_pop, cont_ty)
+            call_chiika_env_pop_frame(self.frame_size(), cont_ty)
         };
         let value_expr = if new_expr.0.is_async_fun_call() {
             // Convert `callee(args...)`
@@ -356,6 +355,16 @@ impl<'a> Compiler<'a> {
         Ok(hir::Expr::return_(value_expr))
     }
 
+    fn lvar_idx(&self, varname: &str) -> usize {
+        let i = self
+            .allocs
+            .iter()
+            .position(|(name, _)| name == varname)
+            .expect("[BUG] lvar not in self.lvars");
+        // +1 for $cont
+        1 + self.orig_func.params.len() + i
+    }
+
     /// Store the value to a temporary variable and return the varref
     fn store_to_tmpvar(&mut self, value: hir::TypedExpr) -> hir::TypedExpr {
         let ty = value.1.clone();
@@ -371,6 +380,11 @@ impl<'a> Compiler<'a> {
         let n = self.gensym_ct;
         self.gensym_ct += 1;
         format!("${n}")
+    }
+
+    fn frame_size(&self) -> usize {
+        // +1 for $cont
+        1 + self.orig_func.params.len() + self.allocs.len()
     }
 }
 

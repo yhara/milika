@@ -1,0 +1,11 @@
+extern print(Int n) -> Null
+extern(async) sleep_sec(Int n) -> Null
+
+fun chiika_main() -> Int {
+  alloc x
+  x = 3
+  print(x)
+  sleep_sec(1)
+  print(x)
+  return 0
+}
