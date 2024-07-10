@@ -1,11 +1,42 @@
-
 extern print(Int n) -> Null
+extern(async) sleep_sec(Int n) -> Null
+
+#fun foo(Int a, Int b) -> Int {
+#  alloc c
+#  c = b
+#  if (a < b) {
+#    print(a + c)
+#    sleep_sec(0)
+#    return a + c
+#  } else {
+#    print(a + c)
+#    sleep_sec(0)
+#    return a + c
+#  }
+#}
+#
+#fun chiika_main() -> Int {
+#  print(foo(1, 2))
+#  return 0
+#}
+
+
+
+#fun countdown(Int i) -> Null {
+#  print(i)
+#  sleep_sec(0)
+#  if (i == 0) {
+#    return null
+#  }
+#  return countdown(i - 1)
+#}
 
 fun chiika_main() -> Int {
-  if (true) {
-    print(456)
-  } else {
-    print(789)
-  }
+  #countdown(3)
+  alloc x
+  x = 3
+  print(x)
+  sleep_sec(1)
+  print(x)
   return 0
 }

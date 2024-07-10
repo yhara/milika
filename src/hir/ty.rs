@@ -84,6 +84,19 @@ impl Ty {
             _ => self == other,
         }
     }
+
+    pub fn type_id(&self) -> i64 {
+        match self {
+            Ty::Null => 0,
+            Ty::Int => 1,
+            Ty::Bool => 2,
+            Ty::Any => 3,
+            Ty::ChiikaEnv => 4,
+            Ty::RustFuture => 5,
+            Ty::Fun(_) => 6,
+            _ => panic!("[BUG] unknown type: {:?}", self),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
