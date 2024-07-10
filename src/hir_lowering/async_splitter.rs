@@ -1,4 +1,7 @@
-//! Example
+//! Convert functions with async calls into CPS (Continuation Passing Style).
+//!
+//! ## Example
+//!
 //! ```
 //! // Before
 //! fun foo() -> Int {
@@ -183,7 +186,8 @@ impl<'a> Compiler<'a> {
                 let new_expr = self.compile_value_expr(*expr, false)?;
                 hir::Expr::yield_(new_expr)
             }
-            hir::Expr::While(_cond_expr, _body_exprs) => todo!(),
+            hir::Expr::While(cond_expr, body_exprs) => 
+                self.compile_while(*cond_expr, body_exprs)?,
             hir::Expr::Alloc(_) => hir::Expr::nop(),
             hir::Expr::Return(expr) => self.compile_return(*expr)?,
             _ => panic!("[BUG] unexpected for async_splitter: {:?}", e.0),
@@ -320,6 +324,35 @@ impl<'a> Compiler<'a> {
             ret_ty: Box::new(hir::Ty::RustFuture),
         };
         hir::Expr::fun_call(hir::Expr::func_ref(chap_name, chap_fun_ty), args)
+    }
+
+    fn compile_while(
+        &mut self,
+        cond_expr: hir::TypedExpr,
+        body_exprs: Vec<hir::TypedExpr>,
+    ) -> Result<Option<hir::TypedExpr>> {
+        let new_cond_expr = self.compile_value_expr(cond_expr, false)?;
+        if self.orig_func.asyncness.is_sync() {
+            let new_body_exprs = self.compile_exprs(body_exprs)?;
+            return Ok(Some(hir::Expr::while_(new_cond_expr, new_body_exprs)));
+        }
+
+        let func_name = self.chapters.current_name().to_string();
+        let while_chap = Chapter::new_async_if_clause(func_name.clone(), "w");
+        let endwhile_chap = Chapter::new_async_end_if(func_name.clone(), "e", hir::Ty::Void);
+
+        let fcall_w = self.branch_call(&while_chap.name);
+        let terminator = hir::Expr::while_(
+            self.compile_value_expr(cond_expr, false)?,
+            vec![hir::Expr::return_(fcall_w)],
+        );
+        self.chapters.add_stmt(terminator);
+
+        self.chapters.add(while_chap);
+        self.compile_if_clause(body_exprs, &endwhile_chap.name)?;
+        self.chapters.add(endwhile_chap);
+
+        Ok(None)
     }
 
     fn compile_return(&mut self, expr: hir::TypedExpr) -> Result<hir::TypedExpr> {
