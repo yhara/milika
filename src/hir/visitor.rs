@@ -54,6 +54,9 @@ pub trait HirVisitor {
                     self.walk_expr(expr)?;
                 }
             }
+            hir::Expr::Spawn(expr) => {
+                self.walk_expr(expr)?;
+            }
             hir::Expr::Alloc(_) => {}
             hir::Expr::Assign(_, rhs) => {
                 self.walk_expr(rhs)?;

@@ -17,6 +17,7 @@ pub fn prelude_funcs(main_is_async: bool) -> String {
         extern chiika_env_set(ENV env, Int idx, ANY obj, Int type_id) -> Null
         extern chiika_env_pop_frame(ENV env, Int expected_len) -> ANY
         extern chiika_env_ref(ENV env, Int idx, Int expected_type_id) -> Int
+        extern chiika_spawn(FN((ENV,FN((ENV,Null)->FUTURE))->FUTURE) f) -> Null
         extern chiika_start_tokio(Int n) -> Int
         fun chiika_start_user(ENV env, FN((ENV,Int)->FUTURE) cont) -> FUTURE {
     " + call_user_main

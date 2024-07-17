@@ -72,6 +72,7 @@ peg::parser! {
       / if()
       / yield()
       / while()
+      / spawn()
       / return()
       / assign()
       / equality()
@@ -94,6 +95,9 @@ peg::parser! {
       = "while" _ cond:expr() _ "{" _ stmts:stmts() _ "}" {
         ast::Expr::While(Box::new(cond), stmts)
       }
+
+    rule spawn() -> ast::Expr
+      = "spawn" _ func:expr() { ast::Expr::Spawn(Box::new(func)) }
 
     rule return() -> ast::Expr
       = "return" _ e:expr() { ast::Expr::Return(Box::new(e)) }

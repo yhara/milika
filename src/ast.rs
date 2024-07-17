@@ -52,6 +52,7 @@ pub enum Expr {
     If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>),
     Yield(Box<Expr>),
     While(Box<Expr>, Vec<Expr>),
+    Spawn(Box<Expr>),
     Alloc(String),
     Assign(String, Box<Expr>),
     Return(Box<Expr>),

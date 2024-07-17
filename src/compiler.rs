@@ -202,7 +202,7 @@ impl<'c> Compiler<'c> {
             }
             hir::Expr::BlockArgRef => self.compile_block_arg_ref(block),
             hir::Expr::Nop => Ok(None),
-            //_ => panic!("should be lowered before compiler.rs: {:?}", texpr.0),
+            _ => panic!("should be lowered before compiler.rs: {:?}", texpr.0),
         }
     }
 
