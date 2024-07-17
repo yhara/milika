@@ -1,3 +1,4 @@
+use crate::ChiikaCont;
 type ChiikaValue = i64;
 type TypeId = i64;
 type EnvItem = (ChiikaValue, TypeId);
@@ -8,12 +9,14 @@ type EnvFrame = Vec<Option<EnvItem>>;
 pub struct ChiikaEnv {
     // Element is either 64-bit integer or 64-bit pointer.
     stack: Vec<EnvFrame>,
+    pub cont: Option<ChiikaCont>,
 }
 
 impl ChiikaEnv {
     pub fn new() -> ChiikaEnv {
         ChiikaEnv {
             stack: vec![vec![]],
+            cont: None,
         }
     }
 

@@ -2,7 +2,6 @@ mod chiika_env;
 use crate::chiika_env::ChiikaEnv;
 mod async_functions;
 mod sync_functions;
-use std::ffi::c_void;
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::task::Poll;
@@ -19,13 +18,16 @@ use std::task::Poll;
 //    0
 //}
 
-pub type ChiikaValue = *mut c_void;
-#[derive(Debug)]
-pub struct ContAndValue(Option<ChiikaCont>, ChiikaValue);
-pub type ContFuture = Pin<Box<dyn Future<Output = ContAndValue>>>;
+pub type ChiikaValue = u64;
+
+#[allow(improper_ctypes_definitions)]
+pub type ContFuture = Box<dyn Future<Output = ChiikaValue> + Unpin>;
 
 #[allow(improper_ctypes_definitions)]
 type ChiikaCont = extern "C" fn(env: *mut ChiikaEnv, value: ChiikaValue) -> ContFuture;
+
+#[allow(improper_ctypes_definitions)]
+type ChiikaThunk = extern "C" fn(env: *mut ChiikaEnv, cont: ChiikaCont) -> ContFuture;
 
 #[allow(improper_ctypes)]
 extern "C" {
@@ -33,8 +35,11 @@ extern "C" {
 }
 
 #[allow(improper_ctypes_definitions)]
-pub extern "C" fn chiika_finish(_env: *mut ChiikaEnv, _v: ChiikaValue) -> ContFuture {
-    Box::pin(poll_fn(move |_context| Poll::Ready(ContAndValue(None, _v))))
+extern "C" fn chiika_finish(env: *mut ChiikaEnv, _v: ChiikaValue) -> ContFuture {
+    unsafe {
+        (*env).cont = None;
+    }
+    Box::new(poll_fn(move |_context| Poll::Ready(_v)))
 }
 
 #[no_mangle]
@@ -45,13 +50,17 @@ pub extern "C" fn chiika_start_tokio(_: i64) -> i64 {
         if future.is_none() {
             future = Some(unsafe { chiika_start_user(&mut env, chiika_finish) });
         }
-        let tmp = future.as_mut().unwrap().as_mut().poll(context);
+        let pinned = Pin::new(future.as_mut().unwrap());
+        let tmp = pinned.poll(context);
         match tmp {
-            Poll::Ready(ContAndValue(Some(cont), value)) => {
-                let new_future = cont(&mut env, value);
-                future = Some(new_future);
+            Poll::Ready(value) => {
+                if let Some(cont) = env.cont {
+                    let new_future = cont(&mut env, value);
+                    future = Some(new_future);
+                } else {
+                    return Poll::Ready(());
+                }
             }
-            Poll::Ready(ContAndValue(None, _)) => return Poll::Ready(()),
             Poll::Pending => return Poll::Pending,
         }
     });
