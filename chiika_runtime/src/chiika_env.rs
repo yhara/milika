@@ -4,11 +4,8 @@ type TypeId = u64;
 type EnvItem = (ChiikaValue, TypeId);
 enum EnvFrame {
     NormalFrame(Vec<Option<EnvItem>>),
-    RustFrame(WrappedFuture),
+    RustFrame(ContFuture),
 }
-
-struct WrappedFuture(ContFuture);
-unsafe impl Send for WrappedFuture {}
 
 #[repr(C)]
 pub struct ChiikaEnv {
@@ -39,12 +36,12 @@ impl ChiikaEnv {
     }
 
     pub fn push_rust_frame(&mut self, future: ContFuture) {
-        self.stack.push(EnvFrame::RustFrame(WrappedFuture(future)));
+        self.stack.push(EnvFrame::RustFrame(future));
     }
 
     pub fn pop_rust_frame(&mut self) -> Option<ContFuture> {
         match self.stack.pop() {
-            Some(EnvFrame::RustFrame(WrappedFuture(future))) => Some(future),
+            Some(EnvFrame::RustFrame(future)) => Some(future),
             _ => None,
         }
     }

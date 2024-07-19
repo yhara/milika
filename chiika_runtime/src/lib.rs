@@ -21,7 +21,7 @@ use std::task::Poll;
 pub type ChiikaValue = u64;
 
 #[allow(improper_ctypes_definitions)]
-pub type ContFuture = Box<dyn Future<Output = ChiikaValue> + Unpin>;
+pub type ContFuture = Box<dyn Future<Output = ChiikaValue> + Unpin + Send>;
 
 #[allow(improper_ctypes_definitions)]
 type ChiikaCont = extern "C" fn(env: *mut ChiikaEnv, value: ChiikaValue) -> ContFuture;
