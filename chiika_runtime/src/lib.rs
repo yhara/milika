@@ -43,7 +43,36 @@ extern "C" fn chiika_finish(env: *mut ChiikaEnv, _v: ChiikaValue) -> ContFuture 
 }
 
 #[no_mangle]
-pub extern "C" fn chiika_start_tokio(_: i64) -> i64 {
+#[allow(improper_ctypes_definitions)]
+pub extern "C" fn chiika_spawn(f: ChiikaThunk) -> u64 {
+    let mut env = ChiikaEnv::new();
+    let poller = poll_fn(move |context| loop {
+        let future = env
+            .pop_rust_frame()
+            .unwrap_or_else(|| f(&mut env, chiika_finish));
+        let mut pinned = Pin::new(future);
+        let tmp = pinned.as_mut().poll(context);
+        match tmp {
+            Poll::Ready(value) => {
+                if let Some(cont) = env.cont {
+                    let new_future = cont(&mut env, value);
+                    env.push_rust_frame(new_future);
+                } else {
+                    return Poll::Ready(());
+                }
+            }
+            Poll::Pending => {
+                env.push_rust_frame(Pin::into_inner(pinned));
+                return Poll::Pending;
+            }
+        }
+    });
+    tokio::spawn(poller);
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn chiika_start_tokio(_: u64) -> u64 {
     let mut env = ChiikaEnv::new();
     let mut future: Option<_> = None;
     let poller = poll_fn(move |context| loop {
@@ -64,6 +93,7 @@ pub extern "C" fn chiika_start_tokio(_: i64) -> i64 {
             Poll::Pending => return Poll::Pending,
         }
     });
+
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
