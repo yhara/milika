@@ -27,7 +27,7 @@ pub type ContFuture = Box<dyn Future<Output = ChiikaValue> + Unpin + Send>;
 type ChiikaCont = extern "C" fn(env: *mut ChiikaEnv, value: ChiikaValue) -> ContFuture;
 
 #[allow(improper_ctypes_definitions)]
-type ChiikaThunk = extern "C" fn(env: *mut ChiikaEnv, cont: ChiikaCont) -> ContFuture;
+type ChiikaThunk = unsafe extern "C" fn(env: *mut ChiikaEnv, cont: ChiikaCont) -> ContFuture;
 
 #[allow(improper_ctypes)]
 extern "C" {
@@ -45,11 +45,32 @@ extern "C" fn chiika_finish(env: *mut ChiikaEnv, _v: ChiikaValue) -> ContFuture 
 #[no_mangle]
 #[allow(improper_ctypes_definitions)]
 pub extern "C" fn chiika_spawn(f: ChiikaThunk) -> u64 {
+    let poller = make_poller(f);
+    tokio::spawn(poller);
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn chiika_start_tokio(_: u64) -> u64 {
+    let poller = make_poller(chiika_start_user);
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(poller);
+
+    // Q: Need this?
+    // sleep(Duration::from_millis(50)).await;
+
+    0
+}
+
+fn make_poller(f: ChiikaThunk) -> impl Future<Output = ()> {
     let mut env = ChiikaEnv::new();
-    let poller = poll_fn(move |context| loop {
+    poll_fn(move |context| loop {
         let future = env
             .pop_rust_frame()
-            .unwrap_or_else(|| f(&mut env, chiika_finish));
+            .unwrap_or_else(|| unsafe { f(&mut env, chiika_finish) });
         let mut pinned = Pin::new(future);
         let tmp = pinned.as_mut().poll(context);
         match tmp {
@@ -66,42 +87,5 @@ pub extern "C" fn chiika_spawn(f: ChiikaThunk) -> u64 {
                 return Poll::Pending;
             }
         }
-    });
-    tokio::spawn(poller);
-    0
-}
-
-#[no_mangle]
-pub extern "C" fn chiika_start_tokio(_: u64) -> u64 {
-    let mut env = ChiikaEnv::new();
-    let mut future: Option<_> = None;
-    let poller = poll_fn(move |context| loop {
-        if future.is_none() {
-            future = Some(unsafe { chiika_start_user(&mut env, chiika_finish) });
-        }
-        let pinned = Pin::new(future.as_mut().unwrap());
-        let tmp = pinned.poll(context);
-        match tmp {
-            Poll::Ready(value) => {
-                if let Some(cont) = env.cont {
-                    let new_future = cont(&mut env, value);
-                    future = Some(new_future);
-                } else {
-                    return Poll::Ready(());
-                }
-            }
-            Poll::Pending => return Poll::Pending,
-        }
-    });
-
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(poller);
-
-    // Q: Need this?
-    // sleep(Duration::from_millis(50)).await;
-
-    0
+    })
 }
