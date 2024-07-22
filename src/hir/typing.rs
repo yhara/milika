@@ -128,6 +128,10 @@ impl<'f> Typing<'f> {
                 self.compile_exprs(lvars, body)?;
                 e.1 = hir::Ty::Void;
             }
+            hir::Expr::Spawn(func) => {
+                self.compile_expr(lvars, func)?;
+                e.1 = hir::Ty::Void;
+            }
             hir::Expr::Alloc(name) => {
                 // Milika vars are always Int now
                 lvars.insert(name.clone(), hir::Ty::Int);

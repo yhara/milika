@@ -148,7 +148,7 @@ impl Verifier {
             }
             hir::Expr::BlockArgRef => (),
             hir::Expr::Nop => (),
-            //_ => panic!("not supported by verifier: {:?}", e.0),
+            _ => panic!("not supported by verifier: {:?}", e.0),
         }
         Ok(())
     }

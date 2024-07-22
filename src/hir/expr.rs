@@ -15,6 +15,7 @@ pub enum Expr {
     If(Box<Typed<Expr>>, Vec<Typed<Expr>>, Vec<Typed<Expr>>),
     Yield(Box<Typed<Expr>>),
     While(Box<Typed<Expr>>, Vec<Typed<Expr>>),
+    Spawn(Box<Typed<Expr>>),
     Alloc(String),
     Assign(String, Box<Typed<Expr>>),
     Return(Box<Typed<Expr>>),
@@ -102,6 +103,7 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, "}}")
             }
+            Expr::Spawn(e) => write!(f, "spawn {}", e.0),
             Expr::Alloc(name) => write!(f, "alloc {}", name),
             Expr::Assign(name, e) => write!(f, "{} = {}", name, e.0),
             Expr::Return(e) => write!(f, "return {}  # {}", e.0, e.1),
@@ -121,14 +123,6 @@ impl Expr {
     pub fn number(n: i64) -> TypedExpr {
         (Expr::Number(n), Ty::Int)
     }
-
-    //pub fn pseudo_var(pv: PseudoVar) -> TypedExpr {
-    //    let t = match pv {
-    //        PseudoVar::True | PseudoVar::False => Ty::Bool,
-    //        PseudoVar::Null => Ty::Null,
-    //    };
-    //    (Expr::PseudoVar(pv), t)
-    //}
 
     pub fn lvar_ref(name: impl Into<String>, ty: Ty) -> TypedExpr {
         (Expr::LVarRef(name.into()), ty)
@@ -194,6 +188,10 @@ impl Expr {
             panic!("[BUG] while cond not bool: {:?}", cond);
         }
         (Expr::While(Box::new(cond), body), Ty::Null)
+    }
+
+    pub fn spawn(e: TypedExpr) -> TypedExpr {
+        (Expr::Spawn(Box::new(e)), Ty::Void)
     }
 
     pub fn alloc(name: impl Into<String>) -> TypedExpr {

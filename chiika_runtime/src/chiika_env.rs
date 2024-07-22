@@ -1,19 +1,23 @@
-type ChiikaValue = i64;
-type TypeId = i64;
+use crate::{ChiikaCont, ContFuture};
+type ChiikaValue = u64;
+type TypeId = u64;
 type EnvItem = (ChiikaValue, TypeId);
-type EnvFrame = Vec<Option<EnvItem>>;
+enum EnvFrame {
+    NormalFrame(Vec<Option<EnvItem>>),
+    RustFrame(ContFuture),
+}
 
 #[repr(C)]
-#[derive(Debug)]
 pub struct ChiikaEnv {
-    // Element is either 64-bit integer or 64-bit pointer.
     stack: Vec<EnvFrame>,
+    pub cont: Option<ChiikaCont>,
 }
 
 impl ChiikaEnv {
     pub fn new() -> ChiikaEnv {
         ChiikaEnv {
-            stack: vec![vec![]],
+            stack: vec![],
+            cont: None,
         }
     }
 
@@ -30,22 +34,36 @@ impl ChiikaEnv {
             None => panic!("[BUG;ChiikaEnv::current_frame_mut] Stack underflow: no frame there"),
         }
     }
+
+    pub fn push_rust_frame(&mut self, future: ContFuture) {
+        self.stack.push(EnvFrame::RustFrame(future));
+    }
+
+    pub fn pop_rust_frame(&mut self) -> Option<ContFuture> {
+        match self.stack.pop() {
+            Some(EnvFrame::RustFrame(future)) => Some(future),
+            _ => None,
+        }
+    }
 }
 
 /// Push a frame to the stack.
 #[no_mangle]
-pub extern "C" fn chiika_env_push_frame(env: *mut ChiikaEnv, size: i64) {
+pub extern "C" fn chiika_env_push_frame(env: *mut ChiikaEnv, size: u64) {
     unsafe {
         let v = std::iter::repeat(None).take(size as usize).collect();
-        (*env).stack.push(v);
+        (*env).stack.push(EnvFrame::NormalFrame(v));
     }
 }
 
 /// Push an item to the current frame.
 #[no_mangle]
-pub extern "C" fn chiika_env_set(env: *mut ChiikaEnv, n: i64, value: ChiikaValue, type_id: TypeId) {
-    let frame = unsafe { (*env).current_frame_mut() };
-    if n > (frame.len() as i64) - 1 {
+pub extern "C" fn chiika_env_set(env: *mut ChiikaEnv, n: u64, value: ChiikaValue, type_id: TypeId) {
+    let frame_ = unsafe { (*env).current_frame_mut() };
+    let EnvFrame::NormalFrame(frame) = frame_ else {
+        panic!("[BUG;chiika_env_set] Rust frame is on the top");
+    };
+    if n > (frame.len() as u64) - 1 {
         panic!(
             "[BUG;chiika_env_set] Index out of bounds: n={}, frame_size={}",
             n,
@@ -58,10 +76,10 @@ pub extern "C" fn chiika_env_set(env: *mut ChiikaEnv, n: i64, value: ChiikaValue
 /// Pop last frame from the stack and returns its first item.
 /// Panics if the frame size is not as expected.
 #[no_mangle]
-pub extern "C" fn chiika_env_pop_frame(env: *mut ChiikaEnv, expected_len: i64) -> i64 {
+pub extern "C" fn chiika_env_pop_frame(env: *mut ChiikaEnv, expected_len: u64) -> u64 {
     let frame = unsafe { (*env).stack.pop() };
     match frame {
-        Some(v) => {
+        Some(EnvFrame::NormalFrame(v)) => {
             if v.len() != expected_len as usize {
                 panic!(
                     "[BUG;chiika_env_pop_frame] Frame size mismatch: expected size={}, but got size={}",
@@ -71,15 +89,21 @@ pub extern "C" fn chiika_env_pop_frame(env: *mut ChiikaEnv, expected_len: i64) -
             }
             v.first().unwrap().unwrap().0
         }
+        Some(EnvFrame::RustFrame(_)) => {
+            panic!("[BUG;chiika_env_pop_frame] Rust frame is on the top");
+        }
         None => panic!("[BUG;chiika_env_pop_frame] Stack underflow: no frame to pop"),
     }
 }
 
 /// Peek the n-th last item in the current frame.
 #[no_mangle]
-pub extern "C" fn chiika_env_ref(env: *mut ChiikaEnv, n: i64, expected_type_id: TypeId) -> i64 {
-    let frame = unsafe { (*env).current_frame() };
-    if n > (frame.len() as i64) - 1 {
+pub extern "C" fn chiika_env_ref(env: *mut ChiikaEnv, n: u64, expected_type_id: TypeId) -> u64 {
+    let frame_ = unsafe { (*env).current_frame() };
+    let EnvFrame::NormalFrame(frame) = frame_ else {
+        panic!("[BUG;chiika_env_ref] Rust frame is on the top");
+    };
+    if n > (frame.len() as u64) - 1 {
         panic!(
             "[BUG;chiika_env_ref] Index out of bounds: n={}, frame_size={}",
             n,

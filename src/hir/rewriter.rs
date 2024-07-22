@@ -43,6 +43,7 @@ pub trait HirRewriter {
             hir::Expr::While(cond_expr, body_exprs) => {
                 hir::Expr::while_(self.walk_expr(*cond_expr)?, self.walk_exprs(body_exprs)?)
             }
+            hir::Expr::Spawn(expr) => hir::Expr::spawn(self.walk_expr(*expr)?),
             hir::Expr::Alloc(_) => expr,
             hir::Expr::Assign(name, rhs) => hir::Expr::assign(name, self.walk_expr(*rhs)?),
             hir::Expr::Return(expr) => hir::Expr::return_(self.walk_expr(*expr)?),

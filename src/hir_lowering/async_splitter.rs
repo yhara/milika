@@ -184,6 +184,10 @@ impl<'a> Compiler<'a> {
                 hir::Expr::yield_(new_expr)
             }
             hir::Expr::While(_cond_expr, _body_exprs) => todo!(),
+            hir::Expr::Spawn(fexpr) => {
+                let new_fexpr = self.compile_value_expr(*fexpr, false)?;
+                call_chiika_spawn(new_fexpr)
+            }
             hir::Expr::Alloc(_) => hir::Expr::nop(),
             hir::Expr::Return(expr) => self.compile_return(*expr)?,
             _ => panic!("[BUG] unexpected for async_splitter: {:?}", e.0),
@@ -547,6 +551,26 @@ fn call_chiika_env_ref(n: hir::TypedExpr) -> hir::TypedExpr {
         hir::Expr::func_ref("chiika_env_ref", fun_ty),
         vec![arg_ref_env(), n, type_id],
     )
+}
+
+fn call_chiika_spawn(f: hir::TypedExpr) -> hir::TypedExpr {
+    let null_cont_ty = hir::FunTy {
+        asyncness: hir::Asyncness::Lowered,
+        param_tys: vec![hir::Ty::ChiikaEnv, hir::Ty::Null],
+        ret_ty: Box::new(hir::Ty::RustFuture),
+    };
+    let new_f_ty = hir::FunTy {
+        asyncness: hir::Asyncness::Lowered,
+        param_tys: vec![hir::Ty::ChiikaEnv, null_cont_ty.into()],
+        ret_ty: Box::new(hir::Ty::RustFuture),
+    };
+    let new_f = (f.0, new_f_ty.clone().into());
+    let fun_ty = hir::FunTy {
+        asyncness: hir::Asyncness::Lowered,
+        param_tys: vec![hir::Ty::Fun(new_f_ty)],
+        ret_ty: Box::new(hir::Ty::Null),
+    };
+    hir::Expr::fun_call(hir::Expr::func_ref("chiika_spawn", fun_ty), vec![new_f])
 }
 
 #[derive(Debug)]

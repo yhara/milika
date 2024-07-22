@@ -112,6 +112,10 @@ impl Compiler {
                 let body = self.compile_exprs(f, lvars, &body)?;
                 hir::Expr::While(Box::new(cond), body)
             }
+            ast::Expr::Spawn(func) => {
+                let func = self.compile_expr(f, lvars, func)?;
+                hir::Expr::Spawn(Box::new(func))
+            }
             ast::Expr::Alloc(name) => {
                 lvars.insert(name.clone());
                 hir::Expr::Alloc(name.clone())
